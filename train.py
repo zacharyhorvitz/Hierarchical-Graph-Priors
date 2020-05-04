@@ -7,7 +7,9 @@ from collections import deque
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import parse_args, make_atari, append_timestamp
-from model import DQN_agent, Experience
+from minecraft_model import DQN_agent, Experience
+
+from malmo_env_env_skyline import MalmoEnvSpecial  
 
 if __name__ == "__main__":
     args = parse_args()
@@ -23,17 +25,26 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     # Initialize environment
-    if type(args.env) == str:
-        env = gym.make(args.env)
-    else:
-        env = args.env
+    # if type(args.env) == str:
+    #     env = gym.make(args.env)
+    # else:
+    #     env = args.env
 
-    if args.model_type == 'cnn':
-        assert args.num_frames
-        env = make_atari(env, args.num_frames)
-    if type(env.action_space) != gym.spaces.Discrete:
-        raise NotImplementedError("DQN for continuous action_spaces hasn't been\
-                implemented")
+
+    # if args.model_type == 'cnn':
+    #     assert args.num_frames
+    #     env = make_atari(env, args.num_frames)
+    # if type(env.action_space) != gym.spaces.Discrete:
+    #     raise NotImplementedError("DQN for continuous action_spaces hasn't been\
+    #             implemented")
+
+    # env = 
+
+    #env = MalmoEnvSpecial("sword_cow")
+
+    # env.setup()
+
+    env = MalmoEnvSpecial("pickaxe_stone",port=9000) #make_atari(env, args.num_frames)
 
     # Check if GPU can be used and was asked for
     if args.gpu and torch.cuda.is_available():
@@ -58,9 +69,11 @@ if __name__ == "__main__":
         "num_frames": args.num_frames,
     }
     agent = DQN_agent(**agent_args)
+    print("Made agent")
 
     # Initialize optimizer
     optimizer = torch.optim.Adam(agent.online.parameters(), lr=args.lr)
+
 
     # Logging for tensorboard
     if args.output_path:
@@ -71,9 +84,12 @@ if __name__ == "__main__":
     # Episode loop
     global_steps = 0
     episode = 0
+    print("Started loop")
     while global_steps < args.max_steps:
+
         print(f"Episode: {episode}, steps: {global_steps}")
         state = env.reset()
+        # state = agent.online.gcn.embed_state(torch.tensor(state).long())
         done = False
         agent.set_epsilon(global_steps, writer)
 
@@ -84,6 +100,7 @@ if __name__ == "__main__":
             global_steps += 1
             action = agent.online.act(state, agent.online.epsilon)
             next_state, reward, done, _ = env.step(action)
+            # next_state = agent.online.gcn.embed_state(torch.tensor(next_state).long())
             steps += 1
             if args.reward_clip:
                 clipped_reward = np.clip(reward, -args.reward_clip,
@@ -110,6 +127,7 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
 
                 # Get loss
+                # print(minibatch)
                 loss = agent.loss_func(minibatch, writer, episode)
 
                 cumulative_loss += loss.item()
@@ -136,6 +154,7 @@ if __name__ == "__main__":
                 # Reset environment
                 cumulative_reward = 0
                 state = env.reset()
+                # state = agent.online.gcn.embed_state(torch.tensor(state).long())
                 action = agent.online.act(state, 0)
                 done = False
                 render = args.render and (episode % args.render_episodes == 0)
@@ -147,6 +166,9 @@ if __name__ == "__main__":
                         env.render()
 
                     state, reward, done, _ = env.step(action)
+
+                    # state = agent.online.gcn.embed_state(torch.tensor(state).long())
+
                     action = agent.online.act(state,
                                               0)  # passing in epsilon = 0
 
