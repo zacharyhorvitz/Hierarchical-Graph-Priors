@@ -255,7 +255,7 @@ class MalmoEnvSpecial(gym.Env):
 
          return mission_xml
 
-    def __init__(self,mission_type,port):
+    def __init__(self,mission_type,port, addr):
         # malmoutils.fix_print()
         # metadata = {'render.modes': ['human']}
         self.env = malmoenv.make()
@@ -273,9 +273,10 @@ class MalmoEnvSpecial(gym.Env):
         self.goal_reward  =  mission_param["goal_reward"]
         self.max_steps =  mission_param["max_steps"]
         self.port = port
+        self.addr = addr
         self.episode = 0
         mission = self.get_mission_xml(self.mission_type)
-        self.env.init(mission,server='127.0.0.1',port=self.port,exp_uid="test",role=0,episode=self.episode,action_filter=self.actions) #, args.port,
+        self.env.init(mission,server=addr,port=self.port,exp_uid="test",role=0,episode=self.episode,action_filter=self.actions) #, args.port,
         self.action_space = self.env.action_space
       
     def step(self,action):
@@ -412,11 +413,11 @@ class MalmoEnvSpecial(gym.Env):
         e = etree.fromstring("""<MissionInit xmlns="http://ProjectMalmo.microsoft.com" 
                                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
                                 SchemaVersion="" PlatformVersion=""" + '\"' + malmo_version + '\"' +
-                             """>
+                             f""">
                                 <ExperimentUID></ExperimentUID>
                                 <ClientRole>0</ClientRole>
                                 <ClientAgentConnection>
-                                    <ClientIPAddress>127.0.0.1</ClientIPAddress>
+                                    <ClientIPAddress>{self.addr}/ClientIPAddress>
                                     <ClientMissionControlPort>0</ClientMissionControlPort>
                                     <ClientCommandsPort>0</ClientCommandsPort>
                                     <AgentIPAddress>127.0.0.1</AgentIPAddress>
@@ -513,13 +514,12 @@ if __name__ == "__main__":
     print("starting server...")
 
     if len(sys.argv) > 1 and sys.argv[1] == "RUN_SERVER":
-        os.chdir("../ling_prior_rl/minecraft")
         print("Launching on port " + sys.argv[2])
-        malmoenv.bootstrap.launch_minecraft(int(sys.argv[2]))
+        malmoenv.bootstrap.launch_minecraft(int(sys.argv[2]), installdir=sys.argv[3])
         exit()
 
     print("initializing environment...")
-    env = MalmoEnvSpecial("pickaxe_stone",port=9000)
+    env = MalmoEnvSpecial("pickaxe_stone",port=9000, addr=sys.argv[4])
     obs = env.reset()
     print("reset")
     for step in range(100):

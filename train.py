@@ -2,6 +2,7 @@ import gym
 import numpy as np
 import random
 import torch
+import time
 import os
 from torch.utils.tensorboard import SummaryWriter
 
@@ -87,9 +88,13 @@ else:
 
 # Episode loop
 global_steps = 0
+steps = 1
 episode = 0
+start = time.time()
+end = time.time() + 1
 while global_steps < args.max_steps:
-    print(f"Episode: {episode}, steps: {global_steps}")
+    print(f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start)}")
+    start = time.time()
     state = env.reset()
     done = False
     agent.set_epsilon(global_steps, writer)
@@ -142,6 +147,7 @@ while global_steps < args.max_steps:
 
     writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
                       episode)
+    end = time.time()
     episode += 1
     if len(agent.replay_buffer
           ) < args.batchsize or global_steps < args.warmup_period:
