@@ -283,7 +283,7 @@ class MalmoEnvSpecial(gym.Env):
         _ , _ , done, info = self.env.step(action)
         # print("INFO",len(info))
         reward = 0
-        if info is not None:
+        if info is not None and info != "":
             observation = json.loads(info)
             if self.mission_type == "hoe_farmland":
                  reached_goal = self.checkBlockExists(observation,self.goal)
