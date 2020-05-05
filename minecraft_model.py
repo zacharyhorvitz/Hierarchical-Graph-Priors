@@ -247,19 +247,23 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
-    def forward(self, state,extract_goal=True):
+    def forward(self, state,extract_goal=True,use_graph=False):
         if extract_goal:
             goals = state[:,:,:,0][:,0,0].clone().detach().long()
             state = state[:,:,:,1:]
 
         # print(state[0][0])
         # print(goals[0])
-        state,node_embeds = self.gcn.embed_state(state.long(),add_graph_embs=True)
+        state,node_embeds = self.gcn.embed_state(state.long(),add_graph_embs=use_graph)
         cnn_output = self.body(state)
         cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-        if extract_goal:
+        if extract_goal and use_graph:
             goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
             cnn_output = torch.cat((cnn_output,goal_embeddings),-1)
+        elif extract_goal:
+            goal_embeddings = self.gcn.get_obj_emb(goals)
+            cnn_output = torch.cat((cnn_output,goal_embeddings),-1)
+
 
         q_value = self.head(cnn_output)
         return q_value
