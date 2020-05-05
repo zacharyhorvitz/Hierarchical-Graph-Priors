@@ -417,7 +417,7 @@ class MalmoEnvSpecial(gym.Env):
                                 <ExperimentUID></ExperimentUID>
                                 <ClientRole>0</ClientRole>
                                 <ClientAgentConnection>
-                                    <ClientIPAddress>{self.addr}/ClientIPAddress>
+                                    <ClientIPAddress>{self.addr}</ClientIPAddress>
                                     <ClientMissionControlPort>0</ClientMissionControlPort>
                                     <ClientCommandsPort>0</ClientCommandsPort>
                                     <AgentIPAddress>127.0.0.1</AgentIPAddress>
