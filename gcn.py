@@ -93,8 +93,9 @@ class GCN(torch.nn.Module):
         if add_graph_embs:
             node_embeddings = self.gcn_embed()
             for n,embedding in zip(self.nodes.tolist(),node_embeddings):
-                indx = (game_state == self.node_to_game_char[n]).nonzero()
-                game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = embedding
+                if n in self.node_to_game_char:
+                    indx = (game_state == self.node_to_game_char[n]).nonzero()
+                    game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = embedding
         # print(game_state_embed.shape)
         return game_state_embed.permute((0,3,1,2)),node_embeddings
 
