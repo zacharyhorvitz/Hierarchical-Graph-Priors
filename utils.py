@@ -16,6 +16,14 @@ def parse_args():
                         help='The gym environment to train on',
                         type=str,
                         required=True)
+    parser.add_argument('--address',
+                        help='ip address',
+                        type=str,
+                        required=True)
+    parser.add_argument('--port',
+                        help='Port',
+                        type=int,
+                        required=True)
     parser.add_argument('--model-type',
                         help="Type of architecture",
                         type=str,
