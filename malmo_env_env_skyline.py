@@ -55,7 +55,7 @@ class MalmoEnvSpecial(gym.Env):
             state_data_raw = state_data_raw['floor9x9']
         else:
             print("FAILED") 
-            return np.zeros((1,1,self.observation_space.shape[-2],self.observation_space.shape[-1])) #self.observation_space
+            return np.zeros((1,1,9,9)) #self.observation_space
 
         state_data = [self.state_map[block] if block in self.state_map else 0.0 for block in state_data_raw]
 
@@ -117,7 +117,7 @@ class MalmoEnvSpecial(gym.Env):
         # print(entity_data)
         entities =  [x for x in entity_data if x["name"] in relevant_entities]
         
-        entity_states = np.zeros((1,self.observation_space.shape[-2],self.observation_space.shape[-1]))
+        entity_states = np.zeros((1,9,9))
         # print(self.observation_space.shape)
         zero_x = entity_states.shape[2]
         zero_x = zero_x // 2 
@@ -300,10 +300,11 @@ class MalmoEnvSpecial(gym.Env):
             obs = self.obs_to_vector(observation)
         else:
             obs = self.observation_space
+            obs = np.concatenate((np.ones((1,1,9,1))*self.entity_map[self.goal],obs),axis=3)
 
         if self.num_steps >= self.max_steps:
            done=True
-
+           
         self.num_steps+=1
         # print(self.num_steps)
         # print(obs)

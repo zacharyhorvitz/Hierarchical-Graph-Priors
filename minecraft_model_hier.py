@@ -212,7 +212,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         # self.gcn = GCN(adjacency,num_nodes,total_objects,dict_2_game)
 
         game_nodes = ["stone","pickaxe","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"]
-        latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality"]
+        latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
         non_node_objects = ["air","wall"]
         total_objects = len(game_nodes + latent_nodes + non_node_objects) #nodes, plus air and wall
         num_nodes = len(game_nodes + latent_nodes)
