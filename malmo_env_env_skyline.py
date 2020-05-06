@@ -14,6 +14,7 @@ import math
 import os
 import random
 import gym
+from gym import spaces
 import sys
 import socket
 import struct
@@ -264,7 +265,7 @@ class MalmoEnvSpecial(gym.Env):
      #   print(mission_param)
         self.actions =["movenorth","movesouth", "movewest", "moveeast","attack","use"] #,"strafe 1","strafe -1"] #,"attack 1","attack 0"]
 
-        self.observation_space = np.zeros((1,1,9,9))
+        self.observation_space = spaces.Box(0, 13, shape=(1,1,9,9))
         self.state_map = mission_param["state_map"]
         self.entity_map = mission_param["entity_map"]
         self.relevant_entities =  mission_param["relevant_entities"]
@@ -299,7 +300,7 @@ class MalmoEnvSpecial(gym.Env):
             # self.fix_player_location(info)
             obs = self.obs_to_vector(observation)
         else:
-            obs = self.observation_space
+            obs = np.zeros(self.observation_space.shape)
             obs = np.concatenate((np.ones((1,1,9,1))*self.entity_map[self.goal],obs),axis=3)
 
         if self.num_steps >= self.max_steps:
