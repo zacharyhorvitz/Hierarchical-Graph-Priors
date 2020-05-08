@@ -332,6 +332,7 @@ class MalmoEnvSpecial(gym.Env):
             sock.connect((self.env.server2, self.env.port2))
             self.env._hello(sock)
             self.env.client_socket = sock  # Now retries will use connected socket.
+        # print(xml)
         self.init_miss(xml)
         self.env.done = False
         return self.env._peek_obs()
@@ -453,7 +454,9 @@ class MalmoEnvSpecial(gym.Env):
             if random_mission:
                 new_mission = random.choice(["pickaxe_stone","axe_log","hoe_farmland","bucket_water"])
                 self.mission_type = new_mission
+                # print(self.mission_type)
                 mission_param = self.load_mission_param(self.mission_type)
+                # print(mission_param)
                 self.state_map = mission_param["state_map"]
                 self.entity_map = mission_param["entity_map"]
                 self.relevant_entities =  mission_param["relevant_entities"]

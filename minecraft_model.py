@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 from collections import deque, namedtuple
-from gcn import GCN
+from gcn_hard_code import GCN
 
 from utils import sync_networks, conv2d_size_out
 
@@ -222,7 +222,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         for i in range(num_nodes):
             adjacency[i][i] = 1.0
         for s,d in edges:
-            adjacency[name_2_node[s]][name_2_node[d]] = 1.0
+            adjacency[name_2_node[d]][name_2_node[s]] = 1.0 #corrected transpose!!!!
 
         # print(adjacency)
         # exit()
