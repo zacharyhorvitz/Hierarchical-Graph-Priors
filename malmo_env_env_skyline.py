@@ -256,10 +256,11 @@ class MalmoEnvSpecial(gym.Env):
 
          return mission_xml
 
-    def __init__(self,mission_type,port, addr):
+    def __init__(self,mission_type,port, addr,train_2=False):
         # malmoutils.fix_print()
         # metadata = {'render.modes': ['human']}
         self.env = malmoenv.make()
+        self.train_2 = train_2
         self.mission_type = mission_type
         mission_param = self.load_mission_param(self.mission_type)
      #   print(mission_param)
@@ -333,6 +334,7 @@ class MalmoEnvSpecial(gym.Env):
             sock.connect((self.env.server2, self.env.port2))
             self.env._hello(sock)
             self.env.client_socket = sock  # Now retries will use connected socket.
+        # print(xml)
         self.init_miss(xml)
         self.env.done = False
         return self.env._peek_obs()
@@ -452,9 +454,15 @@ class MalmoEnvSpecial(gym.Env):
        
         if remake_mission:
             if random_mission:
-                new_mission = random.choice(["pickaxe_stone","axe_log","hoe_farmland","bucket_water"])
+                if self.train_2:
+                    choices = ["hoe_farmland","bucket_water"] #["pickaxe_stone","axe_log"] #,"hoe_farmland","bucket_water"])
+                else:
+                    choices = ["pickaxe_stone","axe_log","hoe_farmland","bucket_water"]
+                new_mission = random.choice(choices)
                 self.mission_type = new_mission
+                # print(self.mission_type)
                 mission_param = self.load_mission_param(self.mission_type)
+                # print(mission_param)
                 self.state_map = mission_param["state_map"]
                 self.entity_map = mission_param["entity_map"]
                 self.relevant_entities =  mission_param["relevant_entities"]

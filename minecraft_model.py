@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 from collections import deque, namedtuple
-from gcn import GCN
+from gcn_hard_code import GCN
 
 from utils import sync_networks, conv2d_size_out
 
@@ -222,7 +222,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         for i in range(num_nodes):
             adjacency[i][i] = 1.0
         for s,d in edges:
-            adjacency[name_2_node[s]][name_2_node[d]] = 1.0
+            adjacency[name_2_node[d]][name_2_node[s]] = 1.0 #corrected transpose!!!!
 
         # print(adjacency)
         # exit()
@@ -247,25 +247,34 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
-    def forward(self, state,extract_goal=True,use_graph=True):
+    def forward(self, state,extract_goal=True,use_graph=True,embedding_baseline=False):
         if extract_goal:
             goals = state[:,:,:,0][:,0,0].clone().detach().long()
             state = state[:,:,:,1:]
 
         # print(state[0][0])
         # print(goals[0])
-        state,node_embeds = self.gcn.embed_state(state.long(),add_graph_embs=use_graph)
-        cnn_output = self.body(state)
-        cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-        if extract_goal and use_graph:
+        if use_graph:
+            state,node_embeds = self.gcn.embed_state(state.long(),add_graph_embs=use_graph)
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
             goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
             cnn_output = torch.cat((cnn_output,goal_embeddings),-1)
-        elif extract_goal:
+            q_value = self.head(cnn_output)
+        elif embedding_baseline:
+            state,node_embeds = self.gcn.embed_state(state.long(),add_graph_embs=use_graph)
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
             goal_embeddings = self.gcn.get_obj_emb(goals)
             cnn_output = torch.cat((cnn_output,goal_embeddings),-1)
+            q_value = self.head(cnn_output)
+        else:
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            goal_embeddings = self.gcn.get_obj_emb(goals)
+            cnn_output = torch.cat((cnn_output,goal_embeddings),-1)
+            q_value = self.head(cnn_output)
 
-
-        q_value = self.head(cnn_output)
         return q_value
 
     def act(self, state, epsilon):
