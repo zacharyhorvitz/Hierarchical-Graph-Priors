@@ -39,7 +39,7 @@ np.random.seed(args.seed)
 #     raise NotImplementedError("DQN for continuous action_spaces hasn't been\
 #             implemented")
 
-env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
+env = MalmoEnvSpecial("pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
