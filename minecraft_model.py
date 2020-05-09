@@ -247,7 +247,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
-    def forward(self, state,extract_goal=True,use_graph=True,embedding_baseline=False):
+    def forward(self, state,extract_goal=True,use_graph=False,embedding_baseline=False):
         if extract_goal:
             goals = state[:,:,:,0][:,0,0].clone().detach().long()
             state = state[:,:,:,1:]
