@@ -92,6 +92,11 @@ steps = 1
 episode = 0
 start = time.time()
 end = time.time() + 1
+
+if args.load_checkpoint_path and checkpoint is not None:
+    global_steps = checkpoint['global_steps']
+    episode = checkpoint['episode']
+
 while global_steps < args.max_steps:
     print(f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start)}")
     start = time.time()
@@ -132,7 +137,7 @@ while global_steps < args.max_steps:
             optimizer.zero_grad()
 
             # Get loss
-            loss = agent.loss_func(minibatch, writer, episode)
+            loss = agent.loss_func(minibatch, writer, global_steps)
 
             cumulative_loss += loss.item()
             loss.backward()
@@ -155,10 +160,10 @@ while global_steps < args.max_steps:
                         "global_steps": global_steps,
                         "model_state_dict": agent.online.state_dict(),
                         "optimizer_state_dict": optimizer.state_dict(),
-                        "loss": loss
+                        "epsiode": episode,
                     },
                     append_timestamp(f"{args.model_path}/checkpoint_{args.env}")
-                    + "_{global_steps}.tar")
+                    + f"_{global_steps}.tar")
 
     writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
                       episode)
