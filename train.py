@@ -153,7 +153,7 @@ while global_steps < args.max_steps:
         if args.model_path:
             if global_steps % args.checkpoint_steps == 0:
                 for filename in os.listdir(f"{args.model_path}/"):
-                    if "checkpoint" in filename:
+                    if "checkpoint" in filename and args.env in filename:
                         os.remove(f"{args.model_path}/" + filename)
                 torch.save(
                     {
