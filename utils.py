@@ -144,6 +144,14 @@ def parse_args():
                         type=int,
                         default=10,
                         required=False)
+    parser.add_argument('--use_hier',
+                        help='Use latent nodes',
+                        action='store_true',
+                        required=False)
+    parser.add_argument('--mode',
+                        help='select mode',
+                        choices=["skyline", "ling_prior","embed_bl","cnn"],
+                        required=True)
 
     return parser.parse_args()
 
