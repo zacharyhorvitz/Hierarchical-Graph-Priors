@@ -5,26 +5,11 @@ from __future__ import division
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# import torchvision.models as models
-# from utils.net_util import norm_col_init, weights_init
 import scipy.sparse as sp
 import numpy as np
 
-# from datasets.glove import Glove
-
-# from .model_io import ModelOutput
-
-
-# def normalize_adj(adj):
-#     adj = sp.coo_matrix(adj)
-#     rowsum = np.array(adj.sum(1))
-#     d_inv_sqrt = np.power(rowsum, -0.5).flatten()
-#     d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
-#     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
-#     return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
-
 class GCN(torch.nn.Module):
-    def __init__(self,adj_mat,num_nodes,num_types,idx_2_game_char,use_cuda=True):
+    def __init__(self,adj_mat,num_nodes,num_types,idx_2_game_char,use_cuda=True,use_graph=True):
         super(GCN, self).__init__()
 
         print("starting init")
@@ -43,26 +28,24 @@ class GCN(torch.nn.Module):
         A = A_raw #normalize_adj(A_raw).tocsr().toarray()
         self.A = A
         if use_cuda: 
-            self.A = self.A.cuda()
+            self.A = self.A.cuda() 
 
-        self.W0 = nn.Linear(self.emb_sz, 16, bias=False)
-        self.W1 = nn.Linear(16, 16, bias=False)
-        self.W2 = nn.Linear(16, 16, bias=False)
+        self.use_graph = use_graph
 
-        self.get_node_emb = nn.Embedding(self.n, self.emb_sz)
+        if self.use_graph:
+            print("Using graph network")
+            self.W0 = nn.Linear(self.emb_sz, 16, bias=False)
+            self.W1 = nn.Linear(16, 16, bias=False)
+            self.W2 = nn.Linear(16, 16, bias=False)
+            self.get_node_emb = nn.Embedding(self.n, self.emb_sz)
+            self.final_mapping = nn.Linear(16, self.emb_sz)
+
         self.get_obj_emb = nn.Embedding(self.num_types, self.emb_sz)
-        self.final_mapping = nn.Linear(16, 4)
+      
 
         print("finished initializing")
 
-    def gcn_embed(self):
-        # x = self.resnet18[0](state)
-        # x = x.view(x.size(0), -1)
-        # x = torch.sigmoid(self.resnet18[1](x))
-        # class_embed = self.get_class_embed(x)
-        # word_embed = self.get_word_embed(self.all_glove.detach())
-        # x = torch.cat((class_embed.repeat(self.n, 1), word_embed), dim=1)
-        
+    def gcn_embed(self):        
         node_embeddings = self.get_node_emb(self.nodes)
 
         x = torch.mm(self.A, node_embeddings)
@@ -71,32 +54,22 @@ class GCN(torch.nn.Module):
         x = F.relu(self.W1(x))
         x = torch.mm(self.A, x)
         x = F.relu(self.W2(x))
-        # x = x.view(1, self.n)
         x = self.final_mapping(x)
         return x
 
-    # def embed_char(self,char_list):
-    #     node_embeddings = self.gcn_embed()
-
-    #     nodes = [self.game_char_to_node[x] for x in char_list]
-
-    def embed_state(self,game_state,add_graph_embs=True):
-        #game_state = (1,10,10)
-        # game_state = game_state.cuda()
-        # print(game_state.shape)
+    def embed_state(self,game_state):
         game_state_embed = self.get_obj_emb(game_state.view(-1,game_state.shape[-2]*game_state.shape[-1]))
         game_state_embed = game_state_embed.view(-1,game_state.shape[-2],game_state.shape[-1],self.emb_sz)
-        # print(game_state_embed.shape)
-
-        # print(game_state_embed.shape)
+       
         node_embeddings = None
-        if add_graph_embs:
+        if self.use_graph:
+            print("USING GRAPHS!!!!!")
             node_embeddings = self.gcn_embed()
             for n,embedding in zip(self.nodes.tolist(),node_embeddings):
                 if n in self.node_to_game_char:
                     indx = (game_state == self.node_to_game_char[n]).nonzero()
                     game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = embedding
-        # print(game_state_embed.shape)
+
         return game_state_embed.permute((0,3,1,2)),node_embeddings
 
 #Build GCN on torch with identity matrix adjacency, with 5 nodes, 6 types and a mapping each node to its state character

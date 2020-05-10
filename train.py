@@ -62,6 +62,8 @@ agent_args = {
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
     "num_frames": args.num_frames,
+    "mode":"skyline", #skyline,ling_prior,embed_bl,cnn
+    "hier"=False
 }
 agent = DQN_agent(**agent_args)
 

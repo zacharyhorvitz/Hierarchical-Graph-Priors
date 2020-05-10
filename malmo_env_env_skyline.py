@@ -1,15 +1,4 @@
-# from __future__ import print_function
-
-# import malmo.minecraftbootstrap
-
-# from future import standard_library
-# standard_library.install_aliases()
-# from builtins import input
-# from builtins import range
-# from builtins import object
-# from  malmo import MalmoPython
 import json
-# import logging
 import math
 import os
 import random
@@ -19,12 +8,7 @@ import sys
 import socket
 import struct
 import time
-# import math
-# from malmo import malmoutils
 import numpy as np
-
-# import tensorflow as tf
-# import math
 from malmoenv.version import malmo_version
 from malmoenv import comms
 
@@ -83,32 +67,11 @@ class MalmoEnvSpecial(gym.Env):
         # print("SHAPE:",state_out.shape)
         return state_out
 
- 
-    # def fix_player_location(self,world_state):
-
-    #     if len(world_state) > 0:
-    #         observation = json.loads(world_state)
-    #         entity_data = observation['entities']
-    #         player_data = [x for x in entity_data if x["name"]=="agent"][0]
-    #         player_loc = (player_data['x'],player_data['z'])
-
-    #         if abs(math.floor(player_loc[0])-player_loc[0]) != 0.5:
-    #             new_x = round(player_loc[0]-0.5)+0.5
-    #             self.env.sendCommand("tpx {}".format(new_x))
-    #             print("FIXED X")
-    #         if abs(math.floor(player_loc[1])-player_loc[1]) != 0.5:
-    #             new_z = round(player_loc[1]-0.5)+0.5
-    #             self.env.sendCommand("tpz {}".format(new_z))
-    #             print("FIXED Z")
-
-
     def add_inventory(self,observation):
         key = 'InventorySlot_0_item'
         if observation[key] in self.relevant_entities:
             return self.entity_map[observation[key] ]
         else: return 0
-
-
 
     def obs_to_ent_vector(self,observation,relevant_entities):
 
@@ -150,7 +113,6 @@ class MalmoEnvSpecial(gym.Env):
             mission_dict["relevant_entities"] = set(mission_dict["entity_map"].keys())
             mission_dict["goal"] = "cobblestone"
             
-
         elif mission_type == "axe_log":
             mission_dict["state_map"] = {"air":0,"bedrock":1,"log":5}
             mission_dict["entity_map"] = {"diamond_axe":6,"log":5}
@@ -163,7 +125,6 @@ class MalmoEnvSpecial(gym.Env):
         #     mission_dict["relevant_entities"] = set(mission_dict["entity_map"].keys())
         #     mission_dict["goal"] = "clay"
             
-
         elif mission_type == "hoe_farmland":
             mission_dict["state_map"] = {"air":0,"bedrock":1,"dirt":7,"farmland":8}
             mission_dict["entity_map"] = {"diamond_hoe":9,"dirt":7,"farmland":8}
@@ -256,11 +217,11 @@ class MalmoEnvSpecial(gym.Env):
 
          return mission_xml
 
-    def __init__(self,mission_type,port, addr,train_2=False):
+    def __init__(self,mission_type,port, addr):
         # malmoutils.fix_print()
         # metadata = {'render.modes': ['human']}
         self.env = malmoenv.make()
-        self.train_2 = train_2
+        # self.train_2 = train_2
         self.mission_type = mission_type
         mission_param = self.load_mission_param(self.mission_type)
      #   print(mission_param)
@@ -361,59 +322,8 @@ class MalmoEnvSpecial(gym.Env):
 
 
     def build_xml(self,xml):
-        # if action_filter is None:
-        #     action_filter = {"move", "turn", "use", "attack"}
-
-        # if not xml.startswith('<Mission'):
-        #     i = xml.index("<Mission")
-        #     if i == -1:
-        #         raise EnvException("Mission xml must contain <Mission> tag.")
-        #     xml = xml[i:]
-
         xml = etree.fromstring(xml)
-        # self.role = role
-        # if exp_uid is None:
-        #     self.exp_uid = str(uuid.uuid4())
-        # else:
-        #     self.exp_uid = exp_uid
-
-        # command_parser = CommandParser(action_filter)
-        # commands = command_parser.get_commands_from_xml(self.xml, self.role)
-        # actions = command_parser.get_actions(commands)
-        # print("role " + str(self.role) + " actions " + str(actions)
-
-        # if action_space:
-        #     self.action_space = action_space
-        # else:
-        #     self.action_space = ActionSpace(actions)
-
-        # self.port = port
-        # if server is not None:
-        #     self.server = server
-        # if server2 is not None:
-        #     self.server2 = server2
-        # else:
-        #     self.server2 = self.server
-        # if port2 is not None:
-        #     self.port2 = port2
-        # else:
-        #     self.port2 = self.port + self.role
-
-        # self.agent_count = len(self.xml.findall(self.ns + 'AgentSection'))
-        # turn_based = self.xml.find('.//' + self.ns + 'TurnBasedCommands') is not None
-        # if turn_based:
-        #     self.turn_key = 'AKWozEre'
-        # else:
-        #     self.turn_key = ""
-        # if step_options is None:
-        #     self.step_options = 0 if not turn_based else 2
-        # else:
-        #     self.step_options = step_options
-        # self.done = True
-        # # print("agent count " + str(self.agent_count) + " turn based  " + turn_based)
-        # self.resync_period = resync
-        # self.resets = episode
-
+  
         e = etree.fromstring("""<MissionInit xmlns="http://ProjectMalmo.microsoft.com" 
                                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
                                 SchemaVersion="" PlatformVersion=""" + '\"' + malmo_version + '\"' +
@@ -439,13 +349,6 @@ class MalmoEnvSpecial(gym.Env):
         xml.find(self.env.ns + 'ClientRole').text = str(self.env.role)
         xml.find(self.env.ns + 'ExperimentUID').text = self.env.exp_uid
 
-        # if self.role != 0 and self.agent_count > 1:
-        #     e = etree.Element(self.ns + 'MinecraftServerConnection',
-        #                       attrib={'address': self.server,
-        #                               'port': str(0)
-        #                               })
-        #     self.xml.insert(2, e)
-
         return xml
 
 
@@ -454,13 +357,10 @@ class MalmoEnvSpecial(gym.Env):
        
         if remake_mission:
             if random_mission:
-                if self.train_2:
-                    choices = ["hoe_farmland","bucket_water"] #["pickaxe_stone","axe_log"] #,"hoe_farmland","bucket_water"])
-                else:
-                    choices = ["pickaxe_stone","axe_log","hoe_farmland","bucket_water"]
+                choices = ["pickaxe_stone","axe_log","hoe_farmland","bucket_water"]
                 new_mission = random.choice(choices)
                 self.mission_type = new_mission
-                # print(self.mission_type)
+                print(self.mission_type)
                 mission_param = self.load_mission_param(self.mission_type)
                 # print(mission_param)
                 self.state_map = mission_param["state_map"]
