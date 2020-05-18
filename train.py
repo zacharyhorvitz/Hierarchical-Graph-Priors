@@ -39,7 +39,7 @@ np.random.seed(args.seed)
 #     raise NotImplementedError("DQN for continuous action_spaces hasn't been\
 #             implemented")
 
-env = MalmoEnvSpecial("pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
+env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
@@ -63,7 +63,7 @@ agent_args = {
     "model_type": args.model_type,
     "num_frames": args.num_frames,
     "mode":args.mode, #skyline,ling_prior,embed_bl,cnn
-    "hier"=args.use_hier
+    "hier":args.use_hier
 }
 agent = DQN_agent(**agent_args)
 
@@ -176,7 +176,7 @@ while global_steps < args.max_steps:
                         "global_steps": global_steps,
                         "model_state_dict": agent.online.state_dict(),
                         "optimizer_state_dict": optimizer.state_dict(),
-                        "epsiode": episode,
+                        "episode": episode,
                     },
                     append_timestamp(f"{args.model_path}/checkpoint_{args.env}")
                     + f"_{global_steps}.tar")
@@ -190,35 +190,34 @@ while global_steps < args.max_steps:
         continue
 
     # Testing policy
+    num_test = 5
     if episode % args.test_policy_episodes == 0:
-        with torch.no_grad():
-            # Reset environment
-            cumulative_reward = 0
-            state = env.reset()
-            action = agent.online.act(state, 0)
-            done = False
-            render = args.render and (episode % args.render_episodes == 0)
+        cumulative_reward = 0
+        for _ in range(num_test):
+            with torch.no_grad():
+                # Reset environment
+                state = env.reset()
+                action = agent.online.act(state, 0)
+                done = False
+                render = args.render and (episode % args.render_episodes == 0)
 
-            # Test episode loop
-            while not done:
-                # Take action in env
-                if render:
-                    env.render()
+                # Test episode loop
+                while not done:
+                    # Take action in env
+                    if render:
+                        env.render()
 
-                state, reward, done, _ = env.step(action)
-                action = agent.online.act(state,
-                                          0)  # passing in epsilon = 0
+                    state, reward, done, _ = env.step(action)
+                    action = agent.online.act(state, 0)  # passing in epsilon = 0
 
-                # Update reward
-                cumulative_reward += reward
+                    # Update reward
+                    cumulative_reward += reward
 
-            env.close()  # close viewer
+                env.close()  # close viewer
+        
+        print(f"Policy_reward for test: {cumulative_reward/num_test}")
 
-            print(f"Policy_reward for test: {cumulative_reward}")
-
-            # Logging
-            writer.add_scalar('validation/policy_reward', cumulative_reward,
-                              episode)
+        writer.add_scalar('validation/policy_reward', cumulative_reward / num_test, episode)
 
 env.close()
 if args.model_path:

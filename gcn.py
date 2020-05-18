@@ -63,7 +63,7 @@ class GCN(torch.nn.Module):
        
         node_embeddings = None
         if self.use_graph:
-            print("USING GRAPHS!!!!!")
+ #           print("USING GRAPHS!!!!!")
             node_embeddings = self.gcn_embed()
             for n,embedding in zip(self.nodes.tolist(),node_embeddings):
                 if n in self.node_to_game_char:

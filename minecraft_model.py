@@ -103,16 +103,13 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
         
-        if mode in {'skyline','ling_prior'}:
-            self.build_gcn(self.mode,self.hier)
-        else:
-            print("Not using graph")
+        self.build_gcn(self.mode,self.hier)
 
         trainable_parameters = sum(
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
-    self.build_gcn(mode,hier)
+    def build_gcn(self,mode,hier):
 
         if hier and mode != "skyline" and mode != "ling_prior":
                 print("{} incompatible mode with hier".format(mode))
@@ -121,7 +118,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
                 print("{} requires hier".format(mode))
                 exit() 
 
-        name_2_node = {e:i for i,e in enumerate(["stone","pickaxe","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"])}    
+        #name_2_node = {e:i for i,e in enumerate(["stone","pickaxe","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"])}    
         game_nodes = ["stone","pickaxe","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"]
         non_node_objects = ["air","wall"]
 
@@ -140,6 +137,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             use_graph = True
         elif mode == "cnn" or mode == "embed_bl":
             use_graph = False
+            latent_nodes = []
+            edges = []
         else:
             print("Invalid configuration")
 
@@ -169,10 +168,11 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             goals = state[:,:,:,0][:,0,0].clone().detach().long()
             state = state[:,:,:,1:]
 
-        print(self.mode,self.hier)
+        #print(self.mode,self.hier)
 
         if self.mode == "skyline" or self.mode == "ling_prior":
             state,node_embeds = self.gcn.embed_state(state.long())
+         #   print(state.shape)
             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
             goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
