@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from utils import parse_args, make_atari, append_timestamp
 from minecraft_model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
-from malmo_env_env_skyline import MalmoEnvSpecial  
+from malmo_numpy_env_draft import MalmoEnvSpecial  
 
 
 args = parse_args()
@@ -39,7 +39,7 @@ np.random.seed(args.seed)
 #     raise NotImplementedError("DQN for continuous action_spaces hasn't been\
 #             implemented")
 
-env = MalmoEnvSpecial("pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
+env = MalmoEnvSpecial()#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
