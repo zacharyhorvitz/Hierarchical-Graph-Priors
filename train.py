@@ -10,6 +10,7 @@ from utils import parse_args, make_atari, append_timestamp
 from minecraft_model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 from malmo_numpy_env_draft import MalmoEnvSpecial  
+#from malmo_env_env_skyline import MalmoEnvSpecial  
 
 
 args = parse_args()
@@ -40,7 +41,7 @@ np.random.seed(args.seed)
 #             implemented")
 
 #env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
-env = MalmoEnvSpecial()#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
+env = MalmoEnvSpecial(random=True,mission=None) #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
@@ -191,7 +192,7 @@ while global_steps < args.max_steps:
         continue
 
     # Testing policy
-    num_test = 5
+    num_test = 50
     if episode % args.test_policy_episodes == 0:
         cumulative_reward = 0
         for _ in range(num_test):

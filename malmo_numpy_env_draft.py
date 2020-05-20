@@ -2,7 +2,7 @@ import numpy as np
 import random
 import sys
 import gym
-
+from gym.spaces import Discrete
 
 
 
@@ -37,21 +37,26 @@ class MalmoEnvSpecial(gym.Env):
 		return arena
 
 	
-	def arena_obs(self,add_selected_item=False,add_goal=False):
+	def arena_obs(self,add_selected_item=True,add_goal=True):
 		cur_arena = self.arena.copy()
 		if add_selected_item:
 			cur_arena[self.player_y][self.player_x] = self.inventory[self.selected_inv_item]
 		obs = cur_arena[self.player_y-4:self.player_y+5,self.player_x-4:self.player_x+5]
 		if add_goal:
 			obs = np.concatenate((np.ones((9,1))*self.object_2_index[self.goal],obs),axis=1)
-		return obs
+	#	print(obs)
+
+		for orig,new in (13,5),(14,7),(15,8):
+			obs = np.where(obs==orig, new, obs) 
+		return obs.reshape(1,9,-1)
 
 	def reset(self):
-		self.current_mission = random.choice(self.mission_types)
+		if self.random:
+			self.current_mission = random.choice(self.mission_types)
 		if self.current_mission == "pickaxe_stone":
 			self.goal = "cobblestone_item"
 		elif self.current_mission == "axe_log":
-			self.goal = "log_item"
+			self.goal = "log" #"log_item"
 		elif self.current_mission == "hoe_farmland":
 			self.goal = "farmland"
 		elif self.current_mission == "bucket_water":
@@ -59,7 +64,7 @@ class MalmoEnvSpecial(gym.Env):
 
 		self.player_x = 6
 		self.player_y = 4
-		self.arena = self.init_map("pickaxe_stone")
+		self.arena = self.init_map(self.current_mission)
 		self.attacking = False
 		self.using = False
 		self.steps = 0
@@ -132,40 +137,53 @@ class MalmoEnvSpecial(gym.Env):
 					self.arena[self.player_y+1][self.player_x] = self.object_2_index["farmland"]
 			if self.arena[self.player_y+1][self.player_x] == self.object_2_index["water"]:
 				if self.inventory[0] == self.object_2_index["bucket_item"]:
+				#	print("using bucket in inventory")
 					self.arena[self.player_y+1][self.player_x] = 0
-					self.inventory[0] == self.object_2_index["water_bucket_item"]	
+					self.inventory[0] = self.object_2_index["water_bucket_item"]	
 
 		goal = self.check_reached_goal()
 		reward = self.goal_reward if goal else self.step_cost
+		#if goal: print("SUCCEEDED")
 		
 		if self.steps >= self.max_steps:
 			terminated = True
 		else:
 			terminated = goal
 		self.steps+=1 
+		
 
+	#	if self.object_2_index["bucket_item"] in self.inventory: print("Bucket item in iventory")
 		#TODO: 
 		# - item health
 		# - other items can destroy log, but it taskes longer
 		# - other items can destroy stone, but no cobblesotne
 		# - inventory switching
+		obs = self.arena_obs(add_selected_item=True,add_goal=True)
+		#print(obs)
+		#print(self.goal)
+		return obs, reward, terminated, {}
 
-		return self.arena_obs(add_selected_item=True,add_goal=True).reshape(1,1,9,10), reward, terminated, {}
 
+	def __init__(self,random,mission=False):
+		self.random = random
+		if random == False:
+			assert mission is not None
+			self.current_mission = mission
 
-	def __init__(self):
-		self.actions =["movenorth","movesouth", "movewest", "moveeast","attack 0","attack 1","use 0","use 1"] 
+		self.actions =["movenorth","movesouth", "movewest", "moveeast","attack 0","attack 1","use 0","use 1"]
+		self.action_space = Discrete(len(self.actions))
 		self.mission_types = ["pickaxe_stone","axe_log","hoe_farmland","bucket_water"]
 		self.step_cost = -0.1
 		self.goal_reward = 100.0
 		self.max_steps = 100.0
 		self.object_2_index = {"air":0,"bedrock":1,"stone":2,"pickaxe_item":3,"cobblestone_item":4,"log":5,"axe_item":6,"dirt":7,"farmland":8,
-		"hoe_item":9,"dirt":7,"farmland":8,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
+		"hoe_item":9,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
 		self.index_2_object = {v:k for k,v in self.object_2_index.items()}
 		self.collectable = {v for k,v in self.object_2_index.items() if "item" in k}
 		self.passable = set(list(self.collectable) + [0] + [self.object_2_index["water"]])
 		self.inventory = np.zeros((10))
 		self.selected_inv_item = 0 #Cannot change!
+		self.reset()
 
 
 
