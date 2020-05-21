@@ -175,7 +175,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         if extract_goal:
             goals = state[:,:,:,0][:,0,0].clone().detach().long()
             state = state[:,:,:,1:]
-            print(goals)
+         #   print(goals)
 
         #print(self.mode,self.hier)
 

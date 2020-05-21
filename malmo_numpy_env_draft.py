@@ -68,6 +68,8 @@ class MalmoEnvSpecial(gym.Env):
 		self.attacking = False
 		self.using = False
 		self.steps = 0
+		self.inventory = np.zeros((10))
+		self.selected_inv_item = 0 #Cannot change!
 		return self.arena_obs()
 
 	def check_reached_goal(self):
@@ -181,8 +183,6 @@ class MalmoEnvSpecial(gym.Env):
 		self.index_2_object = {v:k for k,v in self.object_2_index.items()}
 		self.collectable = {v for k,v in self.object_2_index.items() if "item" in k}
 		self.passable = set(list(self.collectable) + [0] + [self.object_2_index["water"]])
-		self.inventory = np.zeros((10))
-		self.selected_inv_item = 0 #Cannot change!
 		self.reset()
 
 
