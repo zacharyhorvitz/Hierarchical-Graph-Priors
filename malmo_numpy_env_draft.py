@@ -5,7 +5,6 @@ import gym
 from gym.spaces import Discrete
 
 
-
 class MalmoEnvSpecial(gym.Env):
 
 	def init_map(self,mission):
@@ -186,20 +185,17 @@ class MalmoEnvSpecial(gym.Env):
 		self.reset()
 
 
-
-
 if __name__ == "__main__":
-   
+
     env = MalmoEnvSpecial()
     obs = env.reset()
     print("reset")
     for step in range(100):
-        print("\n",step)
+        print("\n", step)
         command = int(input())
         obs, reward, done, info = env.step(command)
         print(obs)
         print(reward)
-
 
 # 1111111111111
 # 1111111111111
