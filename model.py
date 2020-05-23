@@ -70,6 +70,8 @@ class GCN(torch.nn.Module):
         if embed_wall:
             self.wall_embed = torch.FloatTensor(torch.ones(
                 self.emb_sz)).to(device)
+        else:
+            self.wall_embed = None
 
         self.nodes = torch.arange(0, self.n)
         self.nodes = self.nodes.to(device)
@@ -92,7 +94,7 @@ class GCN(torch.nn.Module):
             self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
             self.final_mapping = torch.nn.Linear(16, self.emb_sz)
 
-        self.get_obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
+        self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
 
         print("finished initializing")
 
@@ -109,11 +111,15 @@ class GCN(torch.nn.Module):
         return x
 
     def embed_state(self, game_state):
-        game_state_embed = self.get_obj_emb(
+        game_state_embed = self.obj_emb(
             game_state.view(-1, game_state.shape[-2] * game_state.shape[-1]))
         game_state_embed = game_state_embed.view(-1, game_state.shape[-2],
                                                  game_state.shape[-1],
                                                  self.emb_sz)
+
+        if self.wall_embed:
+            indx = (game_state == 1).nonzero()
+            game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = self.wall_embed
 
         node_embeddings = None
         if self.use_graph:
@@ -126,6 +132,7 @@ class GCN(torch.nn.Module):
                                      indx[:, 2]] = embedding
 
         return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
+
 
 class DQN_MALMO_CNN_model(DQN_Base_model):
     """Docstring for DQN CNN model """
@@ -268,6 +275,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
                 name_2_node[s]] = 1.0  #corrected transpose!!!!
 
         self.gcn = GCN(adjacency,
+                       self.device,
                        num_nodes,
                        total_objects,
                        dict_2_game,
@@ -299,14 +307,14 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             state, _ = self.gcn.embed_state(state.long())
             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-            goal_embeddings = self.gcn.get_obj_emb(goals)
+            goal_embeddings = self.gcn.obj_emb(goals)
             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
             q_value = self.head(cnn_output)
 
         elif self.mode == "cnn":
             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-            goal_embeddings = self.gcn.get_obj_emb(goals)
+            goal_embeddings = self.gcn.obj_emb(goals)
             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
             q_value = self.head(cnn_output)
 
