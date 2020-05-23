@@ -14,7 +14,6 @@ import numpy as np
 
 # from .model_io import ModelOutput
 
-
 # def normalize_adj(adj):
 #     adj = sp.coo_matrix(adj)
 #     rowsum = np.array(adj.sum(1))
@@ -23,27 +22,35 @@ import numpy as np
 #     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
 #     return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
 
+
 class GCN(torch.nn.Module):
-    def __init__(self,adj_mat,num_nodes,num_types,idx_2_game_char,use_cuda=True):
+
+    def __init__(self,
+                 adj_mat,
+                 num_nodes,
+                 num_types,
+                 idx_2_game_char,
+                 use_cuda=True):
         super(GCN, self).__init__()
 
         print("starting init")
         # n = 5
-        self.n = num_nodes #n
+        self.n = num_nodes  #n
         self.num_types = num_types
         self.emb_sz = 4
-        self.wall_embed = torch.FloatTensor(torch.ones(self.emb_sz)).cuda()
 
-        self.nodes = torch.arange(0,self.n)
-        if use_cuda: 
+        self.nodes = torch.arange(0, self.n)
+        if use_cuda:
             self.nodes = self.nodes.cuda()
-        self.node_to_game_char = idx_2_game_char #{i:i+1 for i in self.objects.tolist()}
-        self.game_char_to_node = {v:k for k,v in self.node_to_game_char.items()}
+        self.node_to_game_char = idx_2_game_char  #{i:i+1 for i in self.objects.tolist()}
+        self.game_char_to_node = {
+            v: k for k, v in self.node_to_game_char.items()
+        }
         # get and normalize adjacency matrix.
-        A_raw = adj_mat #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
-        A = A_raw #normalize_adj(A_raw).tocsr().toarray()
+        A_raw = adj_mat  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
+        A = A_raw  #normalize_adj(A_raw).tocsr().toarray()
         self.A = A
-        if use_cuda: 
+        if use_cuda:
             self.A = self.A.cuda()
 
         self.W0 = nn.Linear(self.emb_sz, 16, bias=False)
@@ -63,7 +70,7 @@ class GCN(torch.nn.Module):
         # class_embed = self.get_class_embed(x)
         # word_embed = self.get_word_embed(self.all_glove.detach())
         # x = torch.cat((class_embed.repeat(self.n, 1), word_embed), dim=1)
-        
+
         node_embeddings = self.get_node_emb(self.nodes)
 
         x = torch.mm(self.A, node_embeddings)
@@ -81,13 +88,15 @@ class GCN(torch.nn.Module):
 
     #     nodes = [self.game_char_to_node[x] for x in char_list]
 
-    def embed_state(self,game_state,add_graph_embs=True):
+    def embed_state(self, game_state, add_graph_embs=True):
         #game_state = (1,10,10)
         # game_state = game_state.cuda()
         # print(game_state.shape)
-        game_state_embed = torch.FloatTensor(torch.zeros(game_state.shape[0],game_state.shape[-2],game_state.shape[-1],self.emb_sz)).cuda()
+        game_state_embed = torch.FloatTensor(
+            torch.zeros(game_state.shape[0], game_state.shape[-2],
+                        game_state.shape[-1], self.emb_sz)).cuda()
         indx = (game_state == 1).nonzero()
-        game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] =  self.wall_embed
+        game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = self.wall_embed
         # game_state_embed = self.get_obj_emb(game_state.view(-1,game_state.shape[-2]*game_state.shape[-1]))
         # game_state_embed = game_state_embed.view(-1,game_state.shape[-2],game_state.shape[-1],self.emb_sz)
         # print(game_state_embed.shape)
@@ -96,12 +105,14 @@ class GCN(torch.nn.Module):
         node_embeddings = None
         if add_graph_embs:
             node_embeddings = self.gcn_embed()
-            for n,embedding in zip(self.nodes.tolist(),node_embeddings):
+            for n, embedding in zip(self.nodes.tolist(), node_embeddings):
                 if n in self.node_to_game_char:
                     indx = (game_state == self.node_to_game_char[n]).nonzero()
-                    game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = embedding
+                    game_state_embed[indx[:, 0], indx[:, 1],
+                                     indx[:, 2]] = embedding
         # print(game_state_embed.shape)
-        return game_state_embed.permute((0,3,1,2)),node_embeddings
+        return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
+
 
 #Build GCN on torch with identity matrix adjacency, with 5 nodes, 6 types and a mapping each node to its state character
 
