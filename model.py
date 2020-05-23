@@ -210,7 +210,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         #game_nodes = ["stone","pickaxe_item","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"]
         object_to_char = {
             "air": 0,
-            "bedrock": 1,
+            "wall": 1,
             "stone": 2,
             "pickaxe_item": 3,
             "cobblestone_item": 4,
