@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import argparse
 from datetime import datetime
-from atari_wrappers import AtariPreprocess, MaxAndSkipEnv, FrameStack
 
 
 def parse_args():
@@ -180,11 +179,6 @@ def deque_to_tensor(last_num_frames):
     """ Convert deque of n frames to tensor """
     return torch.cat(list(last_num_frames), dim=0)
 
-
-def make_atari(env, num_frames):
-    """ Wrap env in atari processed env """
-    return FrameStack(MaxAndSkipEnv(AtariPreprocess(env), 4),
-                      num_frames)
 
 
 # Thanks to RoshanRane - Pytorch forums

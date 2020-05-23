@@ -6,11 +6,12 @@ import time
 import os
 from torch.utils.tensorboard import SummaryWriter
 
-from utils import parse_args, make_atari, append_timestamp
-from minecraft_model import DQN_agent, Experience
+from utils.utils import parse_args, append_timestamp
+from model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
-from malmo_numpy_env_draft import MalmoEnvSpecial  
-#from malmo_env_env_skyline import MalmoEnvSpecial  
+
+from envs.malmo_numpy_env import MalmoEnvSpecial  
+#from envs.malmo_env_skyline import MalmoEnvSpecial  
 
 
 args = parse_args()
@@ -24,21 +25,6 @@ if torch.cuda.is_available():
 torch.manual_seed(args.seed)
 random.seed(args.seed)
 np.random.seed(args.seed)
-
-# Initialize environment
-# if type(args.env) == str:
-#     env = gym.make(args.env)
-# else:
-#     env = args.env
-
-# if args.model_type == 'cnn':
-#     assert args.num_frames
-#     if args.no_atari:
-#         print("Using atari preprocessing")
-#         env = make_atari(env, args.num_frames)
-# if type(env.action_space) != gym.spaces.Discrete:
-#     raise NotImplementedError("DQN for continuous action_spaces hasn't been\
-#             implemented")
 
 #env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
 env = MalmoEnvSpecial(random=True,mission=None) #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
