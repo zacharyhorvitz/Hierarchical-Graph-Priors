@@ -29,6 +29,6 @@ PORT=9000
 cd pytorch_dqn/
 
 # Run a script
-unbuffer python train.py --env "npy" --run-tag "skyline_npy" --model-type cnn --gpu --seed 5 --lr 0.00025 --batchsize 32 --replay-buffer-size 1000000 --warmup-period $WARMUP --max-steps 10000000 --test-policy-episodes 50 --reward-clip 0 --epsilon-decay $WARMUP --model-path ../skyline_npy_saved_models --num-frames 4 --address '172.25.203.2' --port $PORT --mode skyline
+unbuffer python train.py --env "npy" --run-tag "skyline_npy" --model-type cnn --gpu --seed 5 --lr 0.00025 --batchsize 32 --replay-buffer-size 1000000 --warmup-period $WARMUP --max-steps 10000000 --test-policy-episodes 50 --reward-clip 0 --epsilon-decay $WARMUP --model-path ../skyline_npy_saved_models --num-frames 4 --mode skyline 
 
 deactivate

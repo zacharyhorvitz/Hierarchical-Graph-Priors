@@ -32,6 +32,8 @@ run_tag = args.run_tag
 if args.env == 'npy':
     env = EnvNpy(random=True,mission=None) 
 elif args.env == 'malmo_server':
+    assert args.address is not None
+    assert args.port is not None
     env = EnvMalmo(random=True,mission=None) 
     #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
 
@@ -160,7 +162,7 @@ while global_steps < args.max_steps:
         if args.model_path:
             if global_steps % args.checkpoint_steps == 0:
                 for filename in os.listdir(f"{args.model_path}/"):
-                    if "checkpoint" in filename and args.env in filename:
+                    if "checkpoint" in filename and run_tag in filename:
                         os.remove(f"{args.model_path}/" + filename)
                 torch.save(
                     {
@@ -169,7 +171,7 @@ while global_steps < args.max_steps:
                         "optimizer_state_dict": optimizer.state_dict(),
                         "episode": episode,
                     },
-                    append_timestamp(f"{args.model_path}/checkpoint_{args.env}")
+                    append_timestamp(f"{args.model_path}/checkpoint_{run_tag}")
                     + f"_{global_steps}.tar")
 
     if not args.no_tensorboard:
@@ -222,4 +224,4 @@ while global_steps < args.max_steps:
 env.close()
 if args.model_path:
     torch.save(agent.online,
-               append_timestamp(f"{args.model_path}/{args.env}") + ".pth")
+               append_timestamp(f"{args.model_path}/{run_tag}") + ".pth")
