@@ -12,23 +12,25 @@ def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env',
-                        help='The gym environment to train on',
+                        help='The malmo environment to train on',
                         type=str,
+                        choices=['npy', 'malmo_server'],
+                        default='npy',
                         required=True)
     parser.add_argument('--address',
                         help='ip address',
                         type=str,
-                        required=True)
+                        required=False)
     parser.add_argument('--port',
                         help='Port',
                         type=int,
-                        required=True)
+                        required=False)
     parser.add_argument('--model-type',
                         help="Type of architecture",
                         type=str,
-                        default='mlp',
-                        choices=["cnn", "mlp"],
-                        required=True)
+                        default='cnn',
+                        choices=["cnn"],
+                        required=False)
     parser.add_argument('--model-path',
                         help='The path to the save the pytorch model',
                         type=str,
@@ -43,7 +45,7 @@ def parse_args():
                         type=str,
                         required=False)
     parser.add_argument('--load-checkpoint-path',
-                        help='Use the gpu or not',
+                        help='Path to checkpoint',
                         type=str,
                         required=False)
     parser.add_argument('--no-atari',
@@ -71,32 +73,32 @@ def parse_args():
     parser.add_argument('--max-steps',
                         help='Number of steps to run for',
                         type=int,
-                        default=100000,
+                        default=10000000,
                         required=False)
     parser.add_argument('--checkpoint-steps',
                         help='Checkpoint every so often',
                         type=int,
-                        default=10000,
+                        default=50000,
                         required=False)
     parser.add_argument('--test-policy-episodes',
                         help='Policy is tested every these many episodes',
                         type=int,
-                        default=5,
+                        default=50,
+                        required=False)
+    parser.add_argument('--num-test-runs',
+                        help='Number of times to test',
+                        type=int,
+                        default=50,
                         required=False)
     parser.add_argument('--warmup-period',
                         help='Number of steps to act randomly and not train',
                         type=int,
-                        default=50000,
+                        default=100000,
                         required=False)
     parser.add_argument('--batchsize',
                         help='Number of experiences sampled from replay buffer',
                         type=int,
-                        default=256,
-                        required=False)
-    parser.add_argument('--update-steps',
-                        help='Number of steps to update for per episode',
-                        type=int,
-                        default=1,
+                        default=32,
                         required=False)
     parser.add_argument('--gradient-clip',
                         help='How much to clip the gradients by',
@@ -112,7 +114,7 @@ def parse_args():
     parser.add_argument('--epsilon-decay',
                         help='Parameter for epsilon decay',
                         type=int,
-                        default=1e3,
+                        default=1000000,
                         required=False)
     parser.add_argument('--epsilon-decay-end',
                         help='Parameter for epsilon decay end',
@@ -122,12 +124,12 @@ def parse_args():
     parser.add_argument('--replay-buffer-size',
                         help='Max size of replay buffer',
                         type=int,
-                        default=500000,
+                        default=1000000,
                         required=False)
     parser.add_argument('--lr',
                         help='Learning rate for the optimizer',
                         type=float,
-                        default=5e-4,
+                        default=2.5e-4,
                         required=False)
     parser.add_argument('--target-moving-average',
                         help='EMA parameter for target network',

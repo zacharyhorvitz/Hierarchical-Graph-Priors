@@ -3,7 +3,7 @@ import numpy as np
 import random
 from collections import deque, namedtuple
 
-from utils.utils import sync_networks, conv2d_size_out
+from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience',
                         ['state', 'action', 'reward', 'next_state', 'done'])
@@ -53,8 +53,8 @@ class DQN_Base_model(torch.nn.Module):
 class GCN(torch.nn.Module):
 
     def __init__(self,
-                 device,
                  adj_mat,
+                 device,
                  num_nodes,
                  num_types,
                  idx_2_game_char,
@@ -81,9 +81,7 @@ class GCN(torch.nn.Module):
         }
         # get and normalize adjacency matrix.
         A_raw = adj_mat  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
-        A = A_raw  #normalize_adj(A_raw).tocsr().toarray()
-        self.A = A.to(device)
-
+        self.A = A_raw.to(device)  #normalize_adj(A_raw).tocsr().toarray().to(device)
         self.use_graph = use_graph
 
         if self.use_graph:
@@ -119,7 +117,8 @@ class GCN(torch.nn.Module):
 
         if self.wall_embed:
             indx = (game_state == 1).nonzero()
-            game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = self.wall_embed
+            game_state_embed[indx[:, 0], indx[:, 1], indx[:,
+                                                          2]] = self.wall_embed
 
         node_embeddings = None
         if self.use_graph:

@@ -6,12 +6,12 @@ import time
 import os
 from torch.utils.tensorboard import SummaryWriter
 
-from utils.utils import parse_args, append_timestamp
+from utils import parse_args, append_timestamp
 from model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
-from envs.malmo_numpy_env import MalmoEnvSpecial  
-#from envs.malmo_env_skyline import MalmoEnvSpecial  
+from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
+from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 
 
 args = parse_args()
@@ -27,7 +27,11 @@ random.seed(args.seed)
 np.random.seed(args.seed)
 
 #env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
-env = MalmoEnvSpecial(random=True,mission=None) #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
+if args.env == 'npy':
+    env = EnvNpy(random=True,mission=None) 
+elif args.env == 'malmo_server':
+    env = EnvMalmo(random=True,mission=None) 
+    #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
@@ -100,7 +104,7 @@ while global_steps < args.max_steps:
     while not done:
         global_steps += 1
         action = agent.online.act(state, agent.online.epsilon)
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done, info = env.step(action)
         steps += 1
         if args.reward_clip:
             clipped_reward = np.clip(reward, -args.reward_clip,
@@ -117,28 +121,25 @@ while global_steps < args.max_steps:
               ) < args.batchsize or global_steps < args.warmup_period:
             continue
 
-        # Training loop
-        for i in range(args.update_steps):
-            # This is list<experiences>
-            minibatch = random.sample(agent.replay_buffer, args.batchsize)
+        # This is list<experiences>
+        minibatch = random.sample(agent.replay_buffer, args.batchsize)
 
-            # This is experience<list<states>, list<actions>, ...>
-            minibatch = Experience(*zip(*minibatch))
-            optimizer.zero_grad()
+        # This is experience<list<states>, list<actions>, ...>
+        minibatch = Experience(*zip(*minibatch))
+        optimizer.zero_grad()
 
-            # Get loss
-            loss = agent.loss_func(minibatch, writer, global_steps)
+        # Get loss
+        loss = agent.loss_func(minibatch, writer, global_steps)
 
-            cumulative_loss += loss.item()
-            loss.backward()
+        cumulative_loss += loss.item()
+        loss.backward()
+        if args.gradient_clip:
             torch.nn.utils.clip_grad_norm_(agent.online.parameters(),
                                            args.gradient_clip)
-            # Update parameters
-            optimizer.step()
-            agent.sync_networks()
+        # Update parameters
+        optimizer.step()
+        agent.sync_networks()
 
-        # Average over update steps
-        cumulative_loss /= args.update_steps
         if args.model_path:
             if global_steps % args.checkpoint_steps == 0:
                 for filename in os.listdir(f"{args.model_path}/"):
@@ -178,10 +179,11 @@ while global_steps < args.max_steps:
         continue
 
     # Testing policy
-    num_test = 50
+    num_test = args.num_test_runs
     if episode % args.test_policy_episodes == 0:
         cumulative_reward = 0
         for _ in range(num_test):
+            test_reward = 0
             with torch.no_grad():
                 # Reset environment
                 state = env.reset()
@@ -195,12 +197,13 @@ while global_steps < args.max_steps:
                     if render:
                         env.render()
 
-                    state, reward, done, _ = env.step(action)
+                    state, reward, done, info = env.step(action)
                     action = agent.online.act(state, 0)  # passing in epsilon = 0
-
                     # Update reward
-                    cumulative_reward += reward
-
+                    test_reward += reward
+                 
+                print(f"{info['mission']}: {test_reward}")
+                cumulative_reward += test_reward
                 env.close()  # close viewer
         
         print(f"Policy_reward for test: {cumulative_reward/num_test}")
