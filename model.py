@@ -399,16 +399,7 @@ class DQN_agent:
 
     def loss_func(self, minibatch, writer=None, writer_step=None):
         # Make tensors
-
-        #print(minibatch.state)
-        #print("done")
-        #state_tensor = torch.Tensor(np.array(minibatch.state)).to(self.device)
-        #       for s in minibatch.state:
-        #           print(s.shape)
         state_tensor = torch.Tensor(np.array(minibatch.state)).to(self.device)
-
-        # state_tensor = torch.Tensor(minibatch.state).to(self.device)
-        # next_state_tensor = torch.Tensor(minibatch.next_state).to(self.device)
         next_state_tensor = torch.Tensor(np.array(minibatch.next_state)).to(
             self.device)
 

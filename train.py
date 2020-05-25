@@ -26,6 +26,8 @@ torch.manual_seed(args.seed)
 random.seed(args.seed)
 np.random.seed(args.seed)
 
+run_tag = args.run_tag
+
 #env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
 if args.env == 'npy':
     env = EnvNpy(random=True,mission=None) 
@@ -66,19 +68,31 @@ optimizer = torch.optim.Adam(agent.online.parameters(), lr=args.lr)
 if args.load_checkpoint_path:
     checkpoint = torch.load(args.load_checkpoint_path)
     agent.online.load_state_dict(checkpoint['model_state_dict'])
+    agent.target.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     agent.online.train()
 
 # Save path
 if args.model_path:
-    if not os.path.isdir(args.model_path):
-        os.makedirs(args.model_path)
+    os.makedirs(args.model_path, exist_ok=True)
+
+if args.output_path:
+    os.makedirs(args.output_path, exist_ok=True)
+
+# Logging via csv
+if args.output_path:
+    log_filename = f"{args.output_path}/{run_tag}.csv"
+    with open(log_filename, "w") as f:
+        f.write("episode,global_steps,cumulative_reward,\n")
+else:
+    log_filename = None
 
 # Logging for tensorboard
-if args.output_path:
-    writer = SummaryWriter(args.output_path)
-else:
-    writer = SummaryWriter(comment=args.env)
+if not args.no_tensorboard:
+    if args.output_path:
+        writer = SummaryWriter(args.output_path)
+    else:
+        writer = SummaryWriter(comment=args.env)
 
 # Episode loop
 global_steps = 0
@@ -129,7 +143,10 @@ while global_steps < args.max_steps:
         optimizer.zero_grad()
 
         # Get loss
-        loss = agent.loss_func(minibatch, writer, global_steps)
+        if not args.no_tensorboard:
+            loss = agent.loss_func(minibatch, writer, global_steps)
+        else:
+            loss = agent.loss_func(minibatch, None, global_steps)
 
         cumulative_loss += loss.item()
         loss.backward()
@@ -139,21 +156,6 @@ while global_steps < args.max_steps:
         # Update parameters
         optimizer.step()
         agent.sync_networks()
-
-        if args.model_path:
-            if global_steps % args.checkpoint_steps == 0:
-                for filename in os.listdir(f"{args.model_path}/"):
-                    if "checkpoint" in filename:
-                        os.remove(f"{args.model_path}/" + filename)
-                torch.save(
-                    {
-                        "global_steps": global_steps,
-                        "model_state_dict": agent.online.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "loss": loss
-                    },
-                    append_timestamp(f"{args.model_path}/checkpoint_{args.env}")
-                    + "_{global_steps}.tar")
 
         if args.model_path:
             if global_steps % args.checkpoint_steps == 0:
@@ -170,8 +172,9 @@ while global_steps < args.max_steps:
                     append_timestamp(f"{args.model_path}/checkpoint_{args.env}")
                     + f"_{global_steps}.tar")
 
-    writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
-                      episode)
+    if not args.no_tensorboard:
+        writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
+                          episode)
     end = time.time()
     episode += 1
     if len(agent.replay_buffer
@@ -208,7 +211,13 @@ while global_steps < args.max_steps:
         
         print(f"Policy_reward for test: {cumulative_reward/num_test}")
 
-        writer.add_scalar('validation/policy_reward', cumulative_reward / num_test, episode)
+        if not args.no_tensorboard:
+            writer.add_scalar('validation/policy_reward', cumulative_reward / num_test, episode)
+
+        if log_filename:
+            with open(log_filename, "a") as f:
+                f.write(
+                    f"{episode},{global_steps},{cumulative_reward},\n")
 
 env.close()
 if args.model_path:
