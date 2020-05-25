@@ -228,12 +228,12 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             [k for k in object_to_char.keys() if k not in non_node_objects])
 
         if mode == "skyline" and not hier:
-            #edges = [ ("pickaxe","stone"),("axe","log"),("hoe","dirt"),("bucket","water"),("stone","cobblestone"),("dirt","farmland"),("water","water_bucket")]
-            #edges = [ ("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
-            edges = [("pickaxe_item", "stone"), ("axe_item", "log"),
-                     ("hoe_item", "dirt"), ("bucket_item", "water"),
-                     ("stone", "cobblestone_item"), ("dirt", "farmland"),
-                     ("water", "water_bucket_item")]
+            # edges = [ ("pickaxe","stone"),("axe","log"),("hoe","dirt"),("bucket","water"),("stone","cobblestone"),("dirt","farmland"),("water","water_bucket")]
+            edges = [ ("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
+            # edges = [("pickaxe_item", "stone"), ("axe_item", "log"),
+                     # ("hoe_item", "dirt"), ("bucket_item", "water"),
+                     # ("stone", "cobblestone_item"), ("dirt", "farmland"),
+                     # ("water", "water_bucket_item")]
             latent_nodes = []
             use_graph = True
         else:
