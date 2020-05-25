@@ -52,6 +52,10 @@ def parse_args():
                         help='Path to checkpoint',
                         type=str,
                         required=False)
+    parser.add_argument('--no-tensorboard',
+                        help='No tensorboard logging',
+                        action='store_true',
+                        required=False)
     parser.add_argument('--no-atari',
                         help='Use atari preprocessing',
                         action='store_false',
@@ -92,7 +96,7 @@ def parse_args():
     parser.add_argument('--num-test-runs',
                         help='Number of times to test',
                         type=int,
-                        default=50,
+                        default=100,
                         required=False)
     parser.add_argument('--warmup-period',
                         help='Number of steps to act randomly and not train',
