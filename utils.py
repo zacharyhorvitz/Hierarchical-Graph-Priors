@@ -17,6 +17,10 @@ def parse_args():
                         choices=['npy', 'malmo_server'],
                         default='npy',
                         required=True)
+    parser.add_argument('--run-tag',
+                        help='Tag to identify experiment',
+                        type=str,
+                        required=True)
     parser.add_argument('--address',
                         help='ip address',
                         type=str,
