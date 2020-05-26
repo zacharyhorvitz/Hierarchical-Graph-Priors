@@ -86,6 +86,7 @@ if args.output_path:
     log_filename = f"{args.output_path}/{run_tag}.csv"
     with open(log_filename, "w") as f:
         f.write("episode,global_steps,cumulative_reward,\n")
+        f.flush()
 else:
     log_filename = None
 
@@ -220,6 +221,7 @@ while global_steps < args.max_steps:
             with open(log_filename, "a") as f:
                 f.write(
                     f"{episode},{global_steps},{cumulative_reward},\n")
+                f.flush()
 
 env.close()
 if args.model_path:
