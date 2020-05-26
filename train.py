@@ -83,7 +83,7 @@ if args.output_path:
 
 # Logging via csv
 if args.output_path:
-    log_filename = f"{args.output_path}/{run_tag}.csv"
+    log_filename = "{args.output_path}/{run_tag}.csv"
     with open(log_filename, "w") as f:
         f.write("episode,global_steps,cumulative_reward,\n")
 else:
