@@ -21,12 +21,12 @@
 module load cuda/10.2 cudnn/7.6.5
 
 # source venv 
-source ../new_venv/bin/activate
+source ../../../new_venv/bin/activate
 
-WARMUP=1000000 #added 0
+WARMUP=100000 #added 0
 PORT=9000
 
-cd pytorch_dqn/
+cd .. #pytorch_dqn/
 
 # Run a script
 unbuffer python train.py --env "npy" --run-tag "skyline_npy" --model-type cnn --gpu --seed 5 --lr 0.00025 --batchsize 32 --replay-buffer-size 1000000 --warmup-period $WARMUP --max-steps 10000000 --test-policy-episodes 50 --reward-clip 0 --epsilon-decay $WARMUP --model-path ../skyline_npy_saved_models --num-frames 4 --mode skyline 
