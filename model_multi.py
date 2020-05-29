@@ -94,6 +94,10 @@ class GCN(torch.nn.Module):
             self.num_layers = len(self.layer_sizes)
 
             self.weights = [[torch.nn.Linear(in_dim,out_dim,bias=False).to(device) for (in_dim,out_dim) in self.layer_sizes] for e in range(self.num_edges)]
+
+            for i in range(self.num_edges):   
+                for j in range(self.num_layers):  
+                     self.add_module(str((i,j)),self.weights[i][j])           
         #weights = types x num_layers
 
     #alternative, define matrix
@@ -122,8 +126,9 @@ class GCN(torch.nn.Module):
            #      print(x)
                
                  layer_out.append(torch.mm(self.A[e], x))#)
-            x = torch.cat([relu(self.weights[e][l](type_features))  for e,type_features in enumerate(layer_out)],axis=1)
-        x = self.final_mapping(x)
+            #x = torch.cat([relu(self.weights[e][l](type_features))  for e,type_features in enumerate(layer_out)],axis=1)
+            x = torch.cat([self.weights[e][l](type_features) for e,type_features in enumerate(layer_out)],axis=1)
+        #x = self.final_mapping(relu(x))
         return x
 
     def embed_state(self, game_state):
@@ -142,7 +147,8 @@ class GCN(torch.nn.Module):
         if self.use_graph:
             # print("USING GRAPHS!!!!!")
             node_embeddings = self.gcn_embed()
-            for n, embedding in zip(self.nodes.tolist(), node_embeddings):
+            node_state_embed = self.final_mapping(relu(node_embeddings))
+            for n, embedding in zip(self.nodes.tolist(), node_state_embed):
                 if n in self.node_to_game_char:
                     indx = (game_state == self.node_to_game_char[n]).nonzero()
                     game_state_embed[indx[:, 0], indx[:, 1],
@@ -202,7 +208,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
 
         self.head = torch.nn.Sequential(*[
             torch.nn.Linear(final_size[0] * final_size[1] * 32 +
-                            4, self.final_dense_layer),
+                            16, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
