@@ -1,9 +1,11 @@
-import gym
-import numpy as np
 import random
-import torch
 import time
 import os
+import json
+
+import gym
+import numpy as np
+import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import parse_args, append_timestamp
@@ -12,7 +14,6 @@ from model import DQN_agent, Experience
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
 from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
-
 
 args = parse_args()
 
@@ -28,14 +29,14 @@ np.random.seed(args.seed)
 
 run_tag = args.run_tag
 
-#env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
+#env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address)
 if args.env == 'npy':
-    env = EnvNpy(random=True,mission=None) 
+    env = EnvNpy(random=True, mission=None)
 elif args.env == 'malmo_server':
     assert args.address is not None
     assert args.port is not None
-    env = EnvMalmo(random=True,mission=None) 
-    #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
+    env = EnvMalmo(random=True, mission=None)
+    #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address)
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
@@ -58,8 +59,8 @@ agent_args = {
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
     "num_frames": args.num_frames,
-    "mode":args.mode, #skyline,ling_prior,embed_bl,cnn
-    "hier":args.use_hier
+    "mode": args.mode,  #skyline,ling_prior,embed_bl,cnn
+    "hier": args.use_hier
 }
 agent = DQN_agent(**agent_args)
 
@@ -124,18 +125,14 @@ while global_steps < args.max_steps:
         next_state, reward, done, info = env.step(action)
         steps += 1
         if args.reward_clip:
-            clipped_reward = np.clip(reward, -args.reward_clip,
-                                     args.reward_clip)
+            clipped_reward = np.clip(reward, -args.reward_clip, args.reward_clip)
         else:
             clipped_reward = reward
-        agent.replay_buffer.append(
-            Experience(state, action, clipped_reward, next_state,
-                       int(done)))
+        agent.replay_buffer.append(Experience(state, action, clipped_reward, next_state, int(done)))
         state = next_state
 
         # If not enough data, try again
-        if len(agent.replay_buffer
-              ) < args.batchsize or global_steps < args.warmup_period:
+        if len(agent.replay_buffer) < args.batchsize or global_steps < args.warmup_period:
             continue
 
         # This is list<experiences>
@@ -154,8 +151,7 @@ while global_steps < args.max_steps:
         cumulative_loss += loss.item()
         loss.backward()
         if args.gradient_clip:
-            torch.nn.utils.clip_grad_norm_(agent.online.parameters(),
-                                           args.gradient_clip)
+            torch.nn.utils.clip_grad_norm_(agent.online.parameters(), args.gradient_clip)
         # Update parameters
         optimizer.step()
         agent.sync_networks()
@@ -176,12 +172,10 @@ while global_steps < args.max_steps:
                     + f"_{global_steps}.tar")
 
     if not args.no_tensorboard:
-        writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
-                          episode)
+        writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps, episode)
     end = time.time()
     episode += 1
-    if len(agent.replay_buffer
-          ) < args.batchsize or global_steps < args.warmup_period:
+    if len(agent.replay_buffer) < args.batchsize or global_steps < args.warmup_period:
         continue
 
     # Testing policy
