@@ -160,7 +160,7 @@ def parse_args():
                         required=False)
     parser.add_argument('--mode',
                         help='select mode',
-                        choices=["skyline", "ling_prior","embed_bl","cnn"],
+                        choices=["both", "val_graph", "adv_graph", "embed_bl", "cnn"],
                         required=True)
 
     return parser.parse_args()

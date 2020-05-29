@@ -82,10 +82,10 @@ class GCN(torch.nn.Module):
 
         if self.use_graph:
             print("Using graph network")
+            self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
             self.W0 = torch.nn.Linear(self.emb_sz, 16, bias=False)
             self.W1 = torch.nn.Linear(16, 16, bias=False)
             self.W2 = torch.nn.Linear(16, 16, bias=False)
-            self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
             self.final_mapping = torch.nn.Linear(16, self.emb_sz)
 
         self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
@@ -149,7 +149,8 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
         self.input_shape = input_shape
-        self.goal_embedding_size = 4
+        self.embedding_size = 4
+        self.embedded_state_size = self.embedding_size * self.input_shape[0] * self.input_shape[1]
         self.mode = mode
         self.hier = hier
 
@@ -168,17 +169,29 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
 
         final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
         final_size = conv2d_size_out(final_size, (3, 3), 1)
+        
+        val_additional_embedding_size = 0
+        adv_additional_embedding_size = 0
+
+        if self.mode in ['both', 'val_graph']:
+            val_additional_embedding_size = self.embedded_state_size
+        if self.mode in ['both', 'adv_graph']:
+            adv_additional_embedding_size = self.embedded_state_size
 
         self.value_stream = torch.nn.Sequential(*[
-            torch.nn.Linear(final_size[0] * final_size[1] * 32 + self.goal_embedding_size,
-                            self.final_dense_layer),
+            torch.nn.Linear(
+                final_size[0] * final_size[1] * 32 + self.embedding_size +
+                val_additional_embedding_size,
+                self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, 1)
         ])
 
         self.advantage_stream = torch.nn.Sequential(*[
-            torch.nn.Linear(final_size[0] * final_size[1] * 32 + self.goal_embedding_size,
-                            self.final_dense_layer),
+            torch.nn.Linear(
+                final_size[0] * final_size[1] * 32 + self.embedding_size +
+                adv_additional_embedding_size,
+                self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
@@ -216,14 +229,18 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
         non_node_objects = ["air", "wall"]
         game_nodes = sorted([k for k in object_to_char.keys() if k not in non_node_objects])
 
-        if mode == "both" and not hier:
+        if mode in ["both", "adv_graph", "val_graph"] and not hier:
             noun_edges = [("pickaxe_item", "stone"), ("axe_item", "log"), ("log", "log_item"),
                           ("hoe_item", "dirt"), ("bucket_item", "water"),
                           ("stone", "cobblestone_item"), ("dirt", "farmland"),
                           ("water", "water_bucket_item")]
-            latent_nodes = []
+            verb_edges = [("pickaxe_item", "attack_1"), ("attack_1", "stone"),
+                          ("axe_item", "attack_1"), ("attack_1", "log"), ("hoe_item", "use_1"),
+                          ("use_1", "dirt"), ("bucket_item", "use_1"), ("use_1", "water")]
+            edges = noun_edges + verb_edges
+            latent_nodes = ['attack_1', 'use_1']
             use_graph = True
-        elif mode == "cnn" or mode == "embed_bl":
+        elif mode in ["cnn", "embed_bl"]:
             use_graph = False
             latent_nodes = []
             edges = []
@@ -242,18 +259,47 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
         print("Latent Nodes:", latent_nodes)
         print("Edges:", edges)
 
-        adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
-        for i in range(num_nodes):
-            adjacency[i][i] = 1.0
-        for s, d in edges:
-            adjacency[name_2_node[d]][name_2_node[s]] = 1.0  #corrected transpose!!!!
+        if mode in ["both", "adv_graph", "val_graph"] and not hier:
+            v_adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
+            a_adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
+            for i in range(num_nodes):
+                v_adjacency[i][i] = 1.0
+                a_adjacency[i][i] = 1.0
 
-        self.gcn = GCN(adjacency,
-                       self.device,
-                       num_nodes,
-                       total_objects,
-                       dict_2_game,
-                       use_graph=use_graph)
+            for s, d in noun_edges:
+                v_adjacency[name_2_node[d]][name_2_node[s]] = 1.0  # corrected transpose!!!!
+
+            for s, d in verb_edges:
+                a_adjacency[name_2_node[d]][name_2_node[s]] = 1.0  # corrected transpose!!!!
+
+            self.val_gcn = GCN(v_adjacency,
+                               self.device,
+                               num_nodes,
+                               total_objects,
+                               dict_2_game,
+                               use_graph=use_graph)
+
+            self.adv_gcn = GCN(a_adjacency,
+                               self.device,
+                               num_nodes,
+                               total_objects,
+                               dict_2_game,
+                               use_graph=use_graph)
+        elif mode in ["cnn", "embed_bl"]:
+            adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
+            for i in range(num_nodes):
+                adjacency[i][i] = 1.0
+            for s, d in edges:
+                adjacency[name_2_node[d]][name_2_node[s]] = 1.0  # corrected transpose!!!!
+            self.gcn = GCN(adjacency,
+                           self.device,
+                           num_nodes,
+                           total_objects,
+                           dict_2_game,
+                           use_graph=use_graph)
+        else:
+            print("Invalid configuration")
+            sys.exit()
 
         print("...finished initializing gcn")
 
@@ -266,23 +312,69 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
 
         #print(self.mode,self.hier)
 
-        if self.mode == "skyline" or self.mode == "ling_prior":
-            state, node_embeds = self.gcn.embed_state(state.long())
-            #   print(state.shape)
+        if self.mode == "both":
             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-            goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
-            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
-            values = self.value_stream(cnn_output)
-            advantage = self.advantage_stream(cnn_output)
+            val_state_embeddings, val_node_embeds = self.val_gcn.embed_state(state.long())
+            val_state_embeddings = val_state_embeddings.reshape(val_state_embeddings.shape[0], -1)
+            val_goal_embeddings = val_node_embeds[[
+                self.val_gcn.game_char_to_node[g.item()] for g in goals
+            ]]
+            val_input = torch.cat((cnn_output, val_goal_embeddings, val_state_embeddings), -1)
+            values = self.value_stream(val_input)
+
+            adv_state_embeddings, adv_node_embeds = self.adv_gcn.embed_state(state.long())
+            adv_state_embeddings = adv_state_embeddings.reshape(adv_state_embeddings.shape[0], -1)
+            adv_goal_embeddings = adv_node_embeds[[
+                self.adv_gcn.game_char_to_node[g.item()] for g in goals
+            ]]
+            adv_input = torch.cat((cnn_output, adv_goal_embeddings, adv_state_embeddings), -1)
+            advantage = self.advantage_stream(adv_input)
+            q_value = values + (advantage - advantage.mean())
+        elif self.mode == "val_graph":
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            val_state_embeddings, val_node_embeds = self.val_gcn.embed_state(state.long())
+            val_state_embeddings = val_state_embeddings.reshape(val_state_embeddings.shape[0], -1)
+            val_goal_embeddings = val_node_embeds[[
+                self.val_gcn.game_char_to_node[g.item()] for g in goals
+            ]]
+            val_input = torch.cat((cnn_output, val_goal_embeddings, val_state_embeddings), -1)
+            values = self.value_stream(val_input)
+
+            _, adv_node_embeds = self.adv_gcn.embed_state(state.long())
+            adv_goal_embeddings = adv_node_embeds[[
+                self.adv_gcn.game_char_to_node[g.item()] for g in goals
+            ]]
+            adv_input = torch.cat((cnn_output, adv_goal_embeddings), -1)
+            advantage = self.advantage_stream(adv_input)
+            q_value = values + (advantage - advantage.mean())
+        elif self.mode == "adv_graph":
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            _, val_node_embeds = self.val_gcn.embed_state(state.long())
+            val_goal_embeddings = val_node_embeds[[
+                self.val_gcn.game_char_to_node[g.item()] for g in goals
+            ]]
+            val_input = torch.cat((cnn_output, val_goal_embeddings), -1)
+            values = self.value_stream(val_input)
+
+            adv_state_embeddings, adv_node_embeds = self.adv_gcn.embed_state(state.long())
+            adv_state_embeddings = adv_state_embeddings.reshape(adv_state_embeddings.shape[0], -1)
+            adv_goal_embeddings = adv_node_embeds[[
+                self.adv_gcn.game_char_to_node[g.item()] for g in goals
+            ]]
+            adv_input = torch.cat((cnn_output, adv_goal_embeddings, adv_state_embeddings), -1)
+            advantage = self.advantage_stream(adv_input)
             q_value = values + (advantage - advantage.mean())
 
         elif self.mode == "embed_bl":
-            state, _ = self.gcn.embed_state(state.long())
             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            state, _ = self.gcn.embed_state(state.long())
+            state = state.reshape(state.shape[0], -1)
             goal_embeddings = self.gcn.obj_emb(goals)
-            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+            cnn_output = torch.cat((cnn_output, goal_embeddings, state), -1)
             values = self.value_stream(cnn_output)
             advantage = self.advantage_stream(cnn_output)
             q_value = values + (advantage - advantage.mean())
