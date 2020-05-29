@@ -5,8 +5,7 @@ from collections import deque, namedtuple
 
 from utils import sync_networks, conv2d_size_out
 
-Experience = namedtuple('Experience',
-                        ['state', 'action', 'reward', 'next_state', 'done'])
+Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
 
 class DQN_Base_model(torch.nn.Module):
@@ -68,17 +67,14 @@ class GCN(torch.nn.Module):
         self.num_types = num_types
         self.emb_sz = 4
         if embed_wall:
-            self.wall_embed = torch.FloatTensor(torch.ones(
-                self.emb_sz)).to(device)
+            self.wall_embed = torch.FloatTensor(torch.ones(self.emb_sz)).to(device)
         else:
             self.wall_embed = None
 
         self.nodes = torch.arange(0, self.n)
         self.nodes = self.nodes.to(device)
         self.node_to_game_char = idx_2_game_char  #{i:i+1 for i in self.objects.tolist()}
-        self.game_char_to_node = {
-            v: k for k, v in self.node_to_game_char.items()
-        }
+        self.game_char_to_node = {v: k for k, v in self.node_to_game_char.items()}
         # get and normalize adjacency matrix.
         A_raw = adj_mat  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
         self.A = A_raw.to(device)  #normalize_adj(A_raw).tocsr().toarray().to(device)
@@ -111,14 +107,14 @@ class GCN(torch.nn.Module):
     def embed_state(self, game_state):
         game_state_embed = self.obj_emb(
             game_state.view(-1, game_state.shape[-2] * game_state.shape[-1]))
-        game_state_embed = game_state_embed.view(-1, game_state.shape[-2],
+        game_state_embed = game_state_embed.view(-1,
+                                                 game_state.shape[-2],
                                                  game_state.shape[-1],
                                                  self.emb_sz)
 
         if self.wall_embed:
             indx = (game_state == 1).nonzero()
-            game_state_embed[indx[:, 0], indx[:, 1], indx[:,
-                                                          2]] = self.wall_embed
+            game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = self.wall_embed
 
         node_embeddings = None
         if self.use_graph:
@@ -150,10 +146,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         """Defining DQN CNN model
         """
         # initialize all parameters
-        print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer,
-                                                input_shape))
-        super(DQN_MALMO_CNN_model, self).__init__(device, state_space,
-                                                  action_space, num_actions)
+        print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer, input_shape))
+        super(DQN_MALMO_CNN_model, self).__init__(device, state_space, action_space, num_actions)
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
         self.input_shape = input_shape
@@ -183,16 +177,14 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         # final_size = conv2d_size_out(final_size, (3, 3), 1)
 
         self.head = torch.nn.Sequential(*[
-            torch.nn.Linear(final_size[0] * final_size[1] * 32 +
-                            4, self.final_dense_layer),
+            torch.nn.Linear(final_size[0] * final_size[1] * 32 + 4, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
 
         self.build_gcn(self.mode, self.hier)
 
-        trainable_parameters = sum(
-            p.numel() for p in self.parameters() if p.requires_grad)
+        trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
     def build_gcn(self, mode, hier):
@@ -225,16 +217,17 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         }
         #object_to_char = {"air":0,"bedrock":1,"stone":2,"pickaxe_item":3,"cobblestone_item":4,"log":5,"axe_item":6,"dirt":7,"farmland":8,"hoe_item":9,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
         non_node_objects = ["air", "wall"]
-        game_nodes = sorted(
-            [k for k in object_to_char.keys() if k not in non_node_objects])
+        game_nodes = sorted([k for k in object_to_char.keys() if k not in non_node_objects])
 
         if mode == "skyline" and not hier:
             # edges = [ ("pickaxe","stone"),("axe","log"),("hoe","dirt"),("bucket","water"),("stone","cobblestone"),("dirt","farmland"),("water","water_bucket")]
-            edges = [ ("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
+            edges = [("pickaxe_item", "stone"), ("axe_item", "log"), ("log", "log_item"),
+                     ("hoe_item", "dirt"), ("bucket_item", "water"), ("stone", "cobblestone_item"),
+                     ("dirt", "farmland"), ("water", "water_bucket_item")]
             # edges = [("pickaxe_item", "stone"), ("axe_item", "log"),
-                     # ("hoe_item", "dirt"), ("bucket_item", "water"),
-                     # ("stone", "cobblestone_item"), ("dirt", "farmland"),
-                     # ("water", "water_bucket_item")]
+            # ("hoe_item", "dirt"), ("bucket_item", "water"),
+            # ("stone", "cobblestone_item"), ("dirt", "farmland"),
+            # ("water", "water_bucket_item")]
             latent_nodes = []
             use_graph = True
         else:
@@ -257,9 +250,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
-        dict_2_game = {
-            i: object_to_char[name] for i, name in enumerate(game_nodes)
-        }  #{0:2,1:3,2:4,3:5,4:6,5:7,6:8,7:9,8:10,9:11,10:12}
+        dict_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)
+                      }  #{0:2,1:3,2:4,3:5,4:6,5:7,6:8,7:9,8:10,9:11,10:12}
         num_nodes = len(game_nodes + latent_nodes)
 
         print("==== GRAPH NETWORK =====")
@@ -271,8 +263,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         for i in range(num_nodes):
             adjacency[i][i] = 1.0
         for s, d in edges:
-            adjacency[name_2_node[d]][
-                name_2_node[s]] = 1.0  #corrected transpose!!!!
+            adjacency[name_2_node[d]][name_2_node[s]] = 1.0  #corrected transpose!!!!
 
         self.gcn = GCN(adjacency,
                        self.device,
@@ -297,9 +288,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             #   print(state.shape)
             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-            goal_embeddings = node_embeds[[
-                self.gcn.game_char_to_node[g.item()] for g in goals
-            ]]
+            goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
             q_value = self.head(cnn_output)
 
@@ -401,8 +390,7 @@ class DQN_agent:
     def loss_func(self, minibatch, writer=None, writer_step=None):
         # Make tensors
         state_tensor = torch.Tensor(np.array(minibatch.state)).to(self.device)
-        next_state_tensor = torch.Tensor(np.array(minibatch.next_state)).to(
-            self.device)
+        next_state_tensor = torch.Tensor(np.array(minibatch.next_state)).to(self.device)
 
         action_tensor = torch.Tensor(minibatch.action).to(self.device)
         reward_tensor = torch.Tensor(minibatch.reward).to(self.device)
@@ -413,27 +401,20 @@ class DQN_agent:
             dim=1, index=action_tensor.long().unsqueeze(1)).squeeze(1)
         with torch.no_grad():
             if self.double_DQN:
-                selected_actions = self.online.argmax_over_actions(
-                    next_state_tensor)
+                selected_actions = self.online.argmax_over_actions(next_state_tensor)
                 q_target = self.target(next_state_tensor).gather(
-                    dim=1,
-                    index=selected_actions.long().unsqueeze(1)).squeeze(1)
+                    dim=1, index=selected_actions.long().unsqueeze(1)).squeeze(1)
             else:
-                q_target = self.target.max_over_actions(
-                    next_state_tensor.detach()).values
+                q_target = self.target.max_over_actions(next_state_tensor.detach()).values
 
-        q_label_batch = reward_tensor + (self.gamma) * (1 -
-                                                        done_tensor) * q_target
+        q_label_batch = reward_tensor + (self.gamma) * (1 - done_tensor) * q_target
         q_label_batch = q_label_batch.detach()
 
         # Logging
         if writer:
-            writer.add_scalar('training/batch_q_label', q_label_batch.mean(),
-                              writer_step)
-            writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(),
-                              writer_step)
-            writer.add_scalar('training/batch_reward', reward_tensor.mean(),
-                              writer_step)
+            writer.add_scalar('training/batch_q_label', q_label_batch.mean(), writer_step)
+            writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
+            writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
         return torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
 
     def sync_networks(self):
@@ -444,12 +425,9 @@ class DQN_agent:
             self.online.epsilon = 1
             self.target.epsilon = 1
         else:
-            self.online.epsilon = max(
-                self.epsilon_decay_end,
-                1 - (global_steps - self.warmup_period) / self.epsilon_decay)
-            self.target.epsilon = max(
-                self.epsilon_decay_end,
-                1 - (global_steps - self.warmup_period) / self.epsilon_decay)
+            self.online.epsilon = max(self.epsilon_decay_end,
+                                      1 - (global_steps - self.warmup_period) / self.epsilon_decay)
+            self.target.epsilon = max(self.epsilon_decay_end,
+                                      1 - (global_steps - self.warmup_period) / self.epsilon_decay)
         if writer:
-            writer.add_scalar('training/epsilon', self.online.epsilon,
-                              global_steps)
+            writer.add_scalar('training/epsilon', self.online.epsilon, global_steps)
