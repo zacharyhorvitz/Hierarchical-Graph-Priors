@@ -33,7 +33,7 @@ def parse_args():
                         help="Type of architecture",
                         type=str,
                         default='cnn',
-                        choices=["cnn"],
+                        choices=["cnn", "dueling"],
                         required=False)
     parser.add_argument('--model-path',
                         help='The path to the save the pytorch model',
@@ -47,6 +47,7 @@ def parse_args():
     parser.add_argument('--output-path',
                         help='The output directory to store training stats',
                         type=str,
+                        default="./logs",
                         required=False)
     parser.add_argument('--load-checkpoint-path',
                         help='Path to checkpoint',
@@ -76,7 +77,7 @@ def parse_args():
     parser.add_argument('--num-frames',
                         help='Number of frames to stack (CNN only)',
                         type=int,
-                        default=4,
+                        default=1,
                         required=False)
     parser.add_argument('--max-steps',
                         help='Number of steps to run for',
