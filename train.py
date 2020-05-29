@@ -84,19 +84,25 @@ if args.output_path:
 
 # Logging via csv
 if args.output_path:
-    log_filename = f"{args.output_path}/{run_tag}.csv"
+    base_filename = os.path.join(args.output_path, run_tag)
+    os.makedirs(base_filename, exist_ok=True)
+    log_filename = os.path.join(base_filename, 'reward.csv')
     with open(log_filename, "w") as f:
-        f.write("episode,global_steps,cumulative_reward,\n")
-        f.flush()
+        f.write("episode,steps,reward\n")
+    with open(os.path.join(base_filename, 'params.json'), 'w') as fp:
+        param_dict = vars(args).copy()
+        del param_dict['output_path']
+        del param_dict['model_path']
+        json.dump(param_dict, fp)
 else:
     log_filename = None
 
+
 # Logging for tensorboard
 if not args.no_tensorboard:
-    if args.output_path:
-        writer = SummaryWriter(args.output_path)
-    else:
-        writer = SummaryWriter(comment=args.env)
+    writer = SummaryWriter(comment=run_tag)
+else:
+    writer = None
 
 # Episode loop
 global_steps = 0
@@ -156,11 +162,11 @@ while global_steps < args.max_steps:
         optimizer.step()
         agent.sync_networks()
 
-        if args.model_path:
+        if args.model_path is not None:
             if global_steps % args.checkpoint_steps == 0:
-                for filename in os.listdir(f"{args.model_path}/"):
+                for filename in os.listdir(args.model_path):
                     if "checkpoint" in filename and run_tag in filename:
-                        os.remove(f"{args.model_path}/" + filename)
+                        os.remove(os.path.join(args.model_path, filename))
                 torch.save(
                     {
                         "global_steps": global_steps,
@@ -168,8 +174,8 @@ while global_steps < args.max_steps:
                         "optimizer_state_dict": optimizer.state_dict(),
                         "episode": episode,
                     },
-                    append_timestamp(f"{args.model_path}/checkpoint_{run_tag}")
-                    + f"_{global_steps}.tar")
+                    append_timestamp(os.path.join(args.model_path, f"checkpoint_{run_tag}")) +
+                    f"_{global_steps}.tar")
 
     if not args.no_tensorboard:
         writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps, episode)
@@ -201,23 +207,22 @@ while global_steps < args.max_steps:
                     action = agent.online.act(state, 0)  # passing in epsilon = 0
                     # Update reward
                     test_reward += reward
-                 
+
                 print(f"{info['mission']}: {test_reward}")
                 cumulative_reward += test_reward
                 env.close()  # close viewer
-        
-        print(f"Policy_reward for test: {cumulative_reward/num_test}")
+
+        cumulative_reward /= num_test
+        print(f"Policy_reward for test: {cumulative_reward}")
 
         if not args.no_tensorboard:
             writer.add_scalar('validation/policy_reward', cumulative_reward / num_test, episode)
 
         if log_filename:
             with open(log_filename, "a") as f:
-                f.write(
-                    f"{episode},{global_steps},{cumulative_reward},\n")
-                f.flush()
+                f.write(f"{episode},{global_steps},{cumulative_reward}\n")
 
 env.close()
 if args.model_path:
     torch.save(agent.online,
-               append_timestamp(f"{args.model_path}/{run_tag}") + ".pth")
+               append_timestamp(os.path.join(args.model_path, run_tag)) + ".pth")
