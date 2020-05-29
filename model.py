@@ -123,15 +123,194 @@ class GCN(torch.nn.Module):
             for n, embedding in zip(self.nodes.tolist(), node_embeddings):
                 if n in self.node_to_game_char:
                     indx = (game_state == self.node_to_game_char[n]).nonzero()
-                    game_state_embed[indx[:, 0], indx[:, 1],
-                                     indx[:, 2]] = embedding
+                    game_state_embed[indx[:, 0], indx[:, 1], indx[:, 2]] = embedding
 
         return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
 
 
-class DQN_MALMO_CNN_model(DQN_Base_model):
-    """Docstring for DQN CNN model """
+class DQN_MALMO_DUELING_model(DQN_Base_model):
+    def __init__(
+        self,
+        device,
+        state_space,
+        action_space,
+        num_actions,
+        num_frames=4,
+        final_dense_layer=50,
+        input_shape=(9, 9),
+        mode="skyline",  #skyline,ling_prior,embed_bl,cnn
+        hier=False):
+        # initialize all parameters
+        print("using MALMO DUELING {} {} {}".format(num_frames, final_dense_layer, input_shape))
+        super(DQN_MALMO_DUELING_model, self).__init__(device,
+                                                      state_space,
+                                                      action_space,
+                                                      num_actions)
+        self.num_frames = num_frames
+        self.final_dense_layer = final_dense_layer
+        self.input_shape = input_shape
+        self.goal_embedding_size = 4
+        self.mode = mode
+        self.hier = hier
 
+        print("building model")
+        self.build_model()
+
+    def build_model(self):
+        # output should be in batchsize x num_actions
+        # First layer takes in states
+        self.body = torch.nn.Sequential(*[
+            torch.nn.Conv2d(self.num_frames, 32, kernel_size=(3, 3), stride=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
+            torch.nn.ReLU(),
+        ])
+
+        final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
+        final_size = conv2d_size_out(final_size, (3, 3), 1)
+
+        self.value_stream = torch.nn.Sequential(*[
+            torch.nn.Linear(final_size[0] * final_size[1] * 32 + self.goal_embedding_size,
+                            self.final_dense_layer),
+            torch.nn.ReLU(),
+            torch.nn.Linear(self.final_dense_layer, 1)
+        ])
+
+        self.advantage_stream = torch.nn.Sequential(*[
+            torch.nn.Linear(final_size[0] * final_size[1] * 32 + self.goal_embedding_size,
+                            self.final_dense_layer),
+            torch.nn.ReLU(),
+            torch.nn.Linear(self.final_dense_layer, self.num_actions)
+        ])
+
+        self.build_gcn(self.mode, self.hier)
+
+        trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"Number of trainable parameters: {trainable_parameters}")
+
+    def build_gcn(self, mode, hier):
+
+        if hier and mode != "skyline" and mode != "ling_prior":
+            print("{} incompatible mode with hier".format(mode))
+            exit()
+        if not hier and mode == "ling_prior":
+            print("{} requires hier".format(mode))
+            exit()
+
+        object_to_char = {
+            "air": 0,
+            "wall": 1,
+            "stone": 2,
+            "pickaxe_item": 3,
+            "cobblestone_item": 4,
+            "log": 5,
+            "axe_item": 6,
+            "dirt": 7,
+            "farmland": 8,
+            "hoe_item": 9,
+            "water": 10,
+            "bucket_item": 11,
+            "water_bucket_item": 12,
+            "log_item": 13,
+        }
+        non_node_objects = ["air", "wall"]
+        game_nodes = sorted([k for k in object_to_char.keys() if k not in non_node_objects])
+
+        if mode == "both" and not hier:
+            noun_edges = [("pickaxe_item", "stone"), ("axe_item", "log"), ("log", "log_item"),
+                          ("hoe_item", "dirt"), ("bucket_item", "water"),
+                          ("stone", "cobblestone_item"), ("dirt", "farmland"),
+                          ("water", "water_bucket_item")]
+            latent_nodes = []
+            use_graph = True
+        elif mode == "cnn" or mode == "embed_bl":
+            use_graph = False
+            latent_nodes = []
+            edges = []
+        else:
+            print("Invalid configuration")
+            sys.exit()
+
+        total_objects = len(game_nodes + latent_nodes + non_node_objects)
+        name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
+        dict_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)
+                      }  #{0:2,1:3,2:4,3:5,4:6,5:7,6:8,7:9,8:10,9:11,10:12}
+        num_nodes = len(game_nodes + latent_nodes)
+
+        print("==== GRAPH NETWORK =====")
+        print("Game Nodes:", game_nodes)
+        print("Latent Nodes:", latent_nodes)
+        print("Edges:", edges)
+
+        adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
+        for i in range(num_nodes):
+            adjacency[i][i] = 1.0
+        for s, d in edges:
+            adjacency[name_2_node[d]][name_2_node[s]] = 1.0  #corrected transpose!!!!
+
+        self.gcn = GCN(adjacency,
+                       self.device,
+                       num_nodes,
+                       total_objects,
+                       dict_2_game,
+                       use_graph=use_graph)
+
+        print("...finished initializing gcn")
+
+    def forward(self, state, extract_goal=True):
+        #print(state.shape)
+        if extract_goal:
+            goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
+            state = state[:, :, :, 1:]
+        #   print(goals)
+
+        #print(self.mode,self.hier)
+
+        if self.mode == "skyline" or self.mode == "ling_prior":
+            state, node_embeds = self.gcn.embed_state(state.long())
+            #   print(state.shape)
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
+            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+            values = self.value_stream(cnn_output)
+            advantage = self.advantage_stream(cnn_output)
+            q_value = values + (advantage - advantage.mean())
+
+        elif self.mode == "embed_bl":
+            state, _ = self.gcn.embed_state(state.long())
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            goal_embeddings = self.gcn.obj_emb(goals)
+            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+            values = self.value_stream(cnn_output)
+            advantage = self.advantage_stream(cnn_output)
+            q_value = values + (advantage - advantage.mean())
+
+        elif self.mode == "cnn":
+            cnn_output = self.body(state)
+            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            goal_embeddings = self.gcn.obj_emb(goals)
+            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+            values = self.value_stream(cnn_output)
+            advantage = self.advantage_stream(cnn_output)
+            q_value = values + (advantage - advantage.mean())
+
+        return q_value
+
+    def act(self, state, epsilon):
+        if random.random() < epsilon:
+            return self.action_space.sample()
+        else:
+            with torch.no_grad():
+                state_tensor = torch.Tensor(state).unsqueeze(0)
+                action_tensor = self.argmax_over_actions(state_tensor)
+                action = action_tensor.cpu().detach().numpy().flatten()[0]
+                assert self.action_space.contains(action)
+            return action
+
+
+class DQN_MALMO_CNN_model(DQN_Base_model):
     def __init__(
         self,
         device,
@@ -368,6 +547,23 @@ class DQN_agent:
             # new_state = test.embed_state(torch.ones((1,10,10)).long())
             # print(new_state.shape)
 
+        elif model_type == "dueling":
+            assert num_frames
+            self.num_frames = num_frames
+            self.online = DQN_MALMO_DUELING_model(device,
+                                                  state_space,
+                                                  action_space,
+                                                  num_actions,
+                                                  num_frames=num_frames,
+                                                  mode=mode,
+                                                  hier=hier)
+            self.target = DQN_MALMO_DUELING_model(device,
+                                                  state_space,
+                                                  action_space,
+                                                  num_actions,
+                                                  num_frames=num_frames,
+                                                  mode=mode,
+                                                  hier=hier)
         else:
             raise NotImplementedError(model_type)
 
