@@ -6,6 +6,48 @@ from gym.spaces import Discrete
 
 
 class MalmoEnvSpecial(gym.Env):
+    def __init__(self, random, mission=False):
+        self.random = random
+        if random == False:
+            assert mission is not None
+            self.current_mission = mission
+
+        self.actions = [
+            "movenorth", "movesouth", "movewest", "moveeast", "attack 0",
+            "attack 1", "use 0", "use 1"
+        ]
+        self.action_space = Discrete(len(self.actions))
+        self.mission_types = [
+            "pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"
+        ]
+        self.step_cost = -0.1
+        self.goal_reward = 100.0
+        self.max_steps = 100.0
+        self.object_2_index = {
+            "air": 0,
+            "bedrock": 1,
+            "stone": 2,
+            "pickaxe_item": 3,
+            "cobblestone_item": 4,
+            "log": 5,
+            "axe_item": 6,
+            "dirt": 7,
+            "farmland": 8,
+            "hoe_item": 9,
+            "water": 10,
+            "bucket_item": 11,
+            "water_bucket_item": 12,
+            "log_item": 13,
+            "dirt_item": 14,
+            "farmland_item": 15
+        }
+        self.index_2_object = {v: k for k, v in self.object_2_index.items()}
+        self.collectable = {
+            v for k, v in self.object_2_index.items() if "item" in k
+        }
+        self.passable = set(
+            list(self.collectable) + [0] + [self.object_2_index["water"]])
+        self.reset()
 
     def init_map(self, mission):
         arena = np.ones((13, 13))
@@ -183,50 +225,6 @@ class MalmoEnvSpecial(gym.Env):
         #print(obs)
         #print(self.goal)
         return obs, reward, terminated, {"mission": self.current_mission}
-
-    def __init__(self, random, mission=False):
-        self.random = random
-        if random == False:
-            assert mission is not None
-            self.current_mission = mission
-
-        self.actions = [
-            "movenorth", "movesouth", "movewest", "moveeast", "attack 0",
-            "attack 1", "use 0", "use 1"
-        ]
-        self.action_space = Discrete(len(self.actions))
-        self.mission_types = [
-            "pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"
-        ]
-        self.step_cost = -0.1
-        self.goal_reward = 100.0
-        self.max_steps = 100.0
-        self.object_2_index = {
-            "air": 0,
-            "bedrock": 1,
-            "stone": 2,
-            "pickaxe_item": 3,
-            "cobblestone_item": 4,
-            "log": 5,
-            "axe_item": 6,
-            "dirt": 7,
-            "farmland": 8,
-            "hoe_item": 9,
-            "water": 10,
-            "bucket_item": 11,
-            "water_bucket_item": 12,
-            "log_item": 13,
-            "dirt_item": 14,
-            "farmland_item": 15
-        }
-        self.index_2_object = {v: k for k, v in self.object_2_index.items()}
-        self.collectable = {
-            v for k, v in self.object_2_index.items() if "item" in k
-        }
-        self.passable = set(
-            list(self.collectable) + [0] + [self.object_2_index["water"]])
-        self.reset()
-
 
 if __name__ == "__main__":
 
