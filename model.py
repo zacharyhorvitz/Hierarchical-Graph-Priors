@@ -59,7 +59,7 @@ class GCN(torch.nn.Module):
                  num_types,
                  idx_2_game_char,
                  embed_wall=False,
-                 use_graph=True):
+                 use_graph=True,atten=False):
         super(GCN, self).__init__()
 
         print("starting init")
@@ -72,6 +72,8 @@ class GCN(torch.nn.Module):
                 self.emb_sz)).to(device)
         else:
             self.wall_embed = None
+
+
 
         self.nodes = torch.arange(0, self.n)
         self.nodes = self.nodes.to(device)
@@ -91,6 +93,11 @@ class GCN(torch.nn.Module):
             self.W2 = torch.nn.Linear(16, 16, bias=False)
             self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
             self.final_mapping = torch.nn.Linear(16, self.emb_sz)
+            if atten:
+                self.atten = torch.nn.Parameter(self.A.detach(), requires_grad=True)
+            else:
+                self.atten = self.A #torch.Variable(self.A.detach(), requires_grad=True)
+
 
         self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
 
@@ -99,11 +106,11 @@ class GCN(torch.nn.Module):
     def gcn_embed(self):
         node_embeddings = self.get_node_emb(self.nodes)
 
-        x = torch.mm(self.A, node_embeddings)
+        x = torch.mm(self.A*self.atten , node_embeddings)
         x = torch.nn.functional.relu(self.W0(x))
-        x = torch.mm(self.A, x)
+        x = torch.mm(self.A*self.atten , x)
         x = torch.nn.functional.relu(self.W1(x))
-        x = torch.mm(self.A, x)
+        x = torch.mm(self.A*self.atten , x)
         x = torch.nn.functional.relu(self.W2(x))
         x = self.final_mapping(x)
         return x
