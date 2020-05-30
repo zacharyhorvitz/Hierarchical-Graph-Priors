@@ -87,8 +87,11 @@ if args.output_path:
     base_filename = os.path.join(args.output_path, run_tag)
     os.makedirs(base_filename, exist_ok=True)
     log_filename = os.path.join(base_filename, 'reward.csv')
+    mission_filename = os.path.join(base_filename, 'mission_distribution.csv')
     with open(log_filename, "w") as f:
         f.write("episode,steps,reward\n")
+    with open(mission_filename, "w") as f:
+        f.write("episode,steps,type,reward\n")
     with open(os.path.join(base_filename, 'params.json'), 'w') as fp:
         param_dict = vars(args).copy()
         del param_dict['output_path']
@@ -188,6 +191,8 @@ while global_steps < args.max_steps:
     num_test = args.num_test_runs
     if episode % args.test_policy_episodes == 0:
         cumulative_reward = 0
+        mission_rewards = {k: 0 for k in env.mission_types}
+
         for _ in range(num_test):
             test_reward = 0
             with torch.no_grad():
@@ -209,10 +214,13 @@ while global_steps < args.max_steps:
                     test_reward += reward
 
                 print(f"{info['mission']}: {test_reward}")
+                mission_rewards[info['mission']] += test_reward
                 cumulative_reward += test_reward
                 env.close()  # close viewer
 
         cumulative_reward /= num_test
+        for k in mission_rewards.keys():
+            mission_rewards[k] /= num_test
         print(f"Policy_reward for test: {cumulative_reward}")
 
         if not args.no_tensorboard:
@@ -221,6 +229,11 @@ while global_steps < args.max_steps:
         if log_filename:
             with open(log_filename, "a") as f:
                 f.write(f"{episode},{global_steps},{cumulative_reward}\n")
+
+        if mission_filename:
+            with open(mission_filename, "a") as f:
+                for k,v in mission_rewards.items():
+                    f.write(f"{episode},{global_steps},{k},{v}\n")
 
 env.close()
 if args.model_path:

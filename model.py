@@ -173,9 +173,9 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
         val_additional_embedding_size = 0
         adv_additional_embedding_size = 0
 
-        if self.mode in ['both', 'val_graph']:
+        if self.mode in ['embed_bl','both', 'val_graph']:
             val_additional_embedding_size = self.embedded_state_size
-        if self.mode in ['both', 'adv_graph']:
+        if self.mode in ['embed_bl', 'both', 'adv_graph']:
             adv_additional_embedding_size = self.embedded_state_size
 
         self.value_stream = torch.nn.Sequential(*[
