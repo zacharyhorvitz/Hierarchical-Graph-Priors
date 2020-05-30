@@ -25,7 +25,7 @@ class MalmoEnvSpecial(gym.Env):
         self.max_steps = 100.0
         self.object_2_index = {
             "air": 0,
-            "bedrock": 1,
+            "wall": 1,
             "stone": 2,
             "pickaxe_item": 3,
             "cobblestone_item": 4,
@@ -87,10 +87,6 @@ class MalmoEnvSpecial(gym.Env):
                 (9, 1)) * self.object_2_index[self.goal], obs),
                                  axis=1)
 
-    #	print(obs)
-
-        for orig, new in (13, 5), (14, 7), (15, 8):
-            obs = np.where(obs == orig, new, obs)
         return obs.reshape(1, 9, -1)
 
     def reset(self):
@@ -99,7 +95,7 @@ class MalmoEnvSpecial(gym.Env):
         if self.current_mission == "pickaxe_stone":
             self.goal = "cobblestone_item"
         elif self.current_mission == "axe_log":
-            self.goal = "log"  #"log_item"
+            self.goal = "log_item"
         elif self.current_mission == "hoe_farmland":
             self.goal = "farmland"
         elif self.current_mission == "bucket_water":
