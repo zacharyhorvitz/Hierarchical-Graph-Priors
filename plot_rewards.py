@@ -53,7 +53,7 @@ def plot(data, hue, style, seed, savepath=None, show=True):
     palette = sns.color_palette(n_colors=len(data[hue].unique()))
 
     if isinstance(seed, list) or seed == 'average':
-        g = sns.relplot(x='steps',
+        g = sns.relplot(x='episode',
                         y='reward',
                         data=data,
                         hue=hue,
@@ -68,7 +68,7 @@ def plot(data, hue, style, seed, savepath=None, show=True):
                         facet_kws={'sharey': False})
 
     elif seed == 'all':
-        g = sns.relplot(x='steps',
+        g = sns.relplot(x='episode',
                         y='reward',
                         data=data,
                         hue=hue,
@@ -86,8 +86,8 @@ def plot(data, hue, style, seed, savepath=None, show=True):
     else:
         raise ValueError(f"{seed} not a recognized choice")
 
-    for ax in g.axes.flatten():
-        ax.set_xlabel(f"steps")
+    # for ax in g.axes.flatten():
+        # ax.set_xlabel(f"steps")
         # ax.set(ylim=(0, 3)) # TODO make this something like 80% of the points are visible
 
     if savepath is not None:
