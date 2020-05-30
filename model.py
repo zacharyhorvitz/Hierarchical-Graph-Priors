@@ -225,6 +225,8 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
             "bucket_item": 11,
             "water_bucket_item": 12,
             "log_item": 13,
+            "dirt_item": 14,
+            "farmland_item": 15,
         }
         non_node_objects = ["air", "wall"]
         game_nodes = sorted([k for k in object_to_char.keys() if k not in non_node_objects])
