@@ -92,7 +92,7 @@ def parse_args():
     parser.add_argument('--test-policy-steps',
                         help='Policy is tested every these many steps',
                         type=int,
-                        default=50,
+                        default=10000,
                         required=False)
     parser.add_argument('--num-test-runs',
                         help='Number of times to test',
@@ -102,7 +102,7 @@ def parse_args():
     parser.add_argument('--warmup-period',
                         help='Number of steps to act randomly and not train',
                         type=int,
-                        default=100000,
+                        default=20000,
                         required=False)
     parser.add_argument('--batchsize',
                         help='Number of experiences sampled from replay buffer',
