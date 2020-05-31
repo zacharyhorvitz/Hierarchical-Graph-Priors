@@ -89,8 +89,8 @@ def parse_args():
                         type=int,
                         default=50000,
                         required=False)
-    parser.add_argument('--test-policy-episodes',
-                        help='Policy is tested every these many episodes',
+    parser.add_argument('--test-policy-steps',
+                        help='Policy is tested every these many steps',
                         type=int,
                         default=50,
                         required=False)
