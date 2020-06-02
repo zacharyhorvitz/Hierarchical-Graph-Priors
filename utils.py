@@ -47,6 +47,7 @@ def parse_args():
     parser.add_argument('--output-path',
                         help='The output directory to store training stats',
                         type=str,
+                        default="./logs",
                         required=False)
     parser.add_argument('--load-checkpoint-path',
                         help='Path to checkpoint',
@@ -76,7 +77,7 @@ def parse_args():
     parser.add_argument('--num-frames',
                         help='Number of frames to stack (CNN only)',
                         type=int,
-                        default=4,
+                        default=1,
                         required=False)
     parser.add_argument('--max-steps',
                         help='Number of steps to run for',
@@ -88,10 +89,10 @@ def parse_args():
                         type=int,
                         default=50000,
                         required=False)
-    parser.add_argument('--test-policy-episodes',
-                        help='Policy is tested every these many episodes',
+    parser.add_argument('--test-policy-steps',
+                        help='Policy is tested every these many steps',
                         type=int,
-                        default=50,
+                        default=10000,
                         required=False)
     parser.add_argument('--num-test-runs',
                         help='Number of times to test',
@@ -101,7 +102,7 @@ def parse_args():
     parser.add_argument('--warmup-period',
                         help='Number of steps to act randomly and not train',
                         type=int,
-                        default=100000,
+                        default=20000,
                         required=False)
     parser.add_argument('--batchsize',
                         help='Number of experiences sampled from replay buffer',
