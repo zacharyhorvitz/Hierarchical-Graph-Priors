@@ -1,7 +1,6 @@
 import argparse
 import glob
 import os
-import sys
 import json
 
 import seaborn as sns
@@ -11,20 +10,23 @@ import numpy as np
 
 sns.set(style="darkgrid")
 
-def parse_filepath(fp, bin_size):
+
+def smooth_and_bin(data, bin_size, window_size):
+    numeric_dtypes = data.dtypes.apply(pd.api.types.is_numeric_dtype)
+    numeric_cols = numeric_dtypes.index[numeric_dtypes]
+    data[numeric_cols] = data[numeric_cols].rolling(window_size).mean()
+    # starting from window_size, get every bin_size row
+    data = data[window_size::bin_size] 
+    return data
+
+
+def parse_filepath(fp, bin_size, window_size):
     try:
         data = pd.read_csv(f"{fp}/reward.csv")
-        ignore_trailing_n = int(len(data) - np.floor(len(data)/bin_size)*bin_size)
-        max_idx = len(data) - ignore_trailing_n
-        data = pd.DataFrame(
-                np.einsum(
-                    'ijk->ik',
-                    data.values[:max_idx].reshape(-1, bin_size, data[:max_idx].shape[1])
-                    )/bin_size,
-                columns=data.columns)
+        data = smooth_and_bin(data, bin_size, window_size)
         with open(f"{fp}/params.json", "r") as json_file:
             params = json.load(json_file)
-        for k,v in params.items():
+        for k, v in params.items():
             data[k] = v
         return data
     except FileNotFoundError as e:
@@ -32,11 +34,11 @@ def parse_filepath(fp, bin_size):
         return None
 
 
-def collate_results(results_dir, bin_size):
+def collate_results(results_dir, bin_size, window_size):
     dfs = []
-    for run in glob.glob(os.path.join(os.path.normpath(results_dir),'*')):
+    for run in glob.glob(os.path.join(os.path.normpath(results_dir), '*')):
         print(f"Found {run}")
-        run_df = parse_filepath(run, bin_size)
+        run_df = parse_filepath(run, bin_size, window_size)
         if run_df is None:
             continue
         dfs.append(run_df)
@@ -87,8 +89,8 @@ def plot(data, hue, style, seed, savepath=None, show=True):
         raise ValueError(f"{seed} not a recognized choice")
 
     # for ax in g.axes.flatten():
-        # ax.set_xlabel(f"steps")
-        # ax.set(ylim=(0, 3)) # TODO make this something like 80% of the points are visible
+    # ax.set_xlabel(f"steps")
+    # ax.set(ylim=(0, 3)) # TODO make this something like 80% of the points are visible
 
     if savepath is not None:
         g.savefig(savepath)
@@ -107,7 +109,8 @@ def parse_args():
             required=False, type=str)
     parser.add_argument('--create-csv', help='Create csv, overwrites if exists',
             action='store_true')
-    parser.add_argument('--bin-size', help='How much to reduce the data by', type=int, default=1000)
+    parser.add_argument('--bin-size', help='How much to reduce the data by', type=int, default=100)
+    parser.add_argument('--window-size', help='How much to average the data by', type=int, default=100)
 
     parser.add_argument('--query', help='DF query string', type=str)
     parser.add_argument('--hue', help='Hue variable', type=str)
@@ -128,18 +131,13 @@ if __name__ == "__main__":
     if args.create_csv:
         print("Recreating csv in results directory")
         print(f"Binning by {args.bin_size}")
-        df = collate_results(args.results_dir, args.bin_size)
-        df['bin_size'] = args.bin_size
+        df = collate_results(args.results_dir, args.bin_size, args.window_size)
         df.to_csv(os.path.join(args.results_dir, 'combined.csv'))
 
     if not args.no_plot:
         if args.save_path:
             os.makedirs(os.path.split(args.save_path)[0], exist_ok=True)
         df = pd.read_csv(os.path.join(args.results_dir, 'combined.csv'))
-        bin_size = df['bin_size'].unique()
-        assert len(bin_size) > 0, "Must include bin size when creating plots."
-        bin_size = bin_size[0]
-        del df['bin_size']
         if args.query is not None:
             print(f"Filtering with {args.query}")
             df = df.query(args.query)
