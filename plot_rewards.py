@@ -20,9 +20,9 @@ def smooth_and_bin(data, bin_size, window_size):
     return data
 
 
-def parse_filepath(fp, bin_size, window_size):
+def parse_filepath(fp, filename, bin_size, window_size):
     try:
-        data = pd.read_csv(f"{fp}/reward.csv")
+        data = pd.read_csv(f"{fp}/{filename}")
         data = smooth_and_bin(data, bin_size, window_size)
         with open(f"{fp}/params.json", "r") as json_file:
             params = json.load(json_file)
@@ -34,20 +34,20 @@ def parse_filepath(fp, bin_size, window_size):
         return None
 
 
-def collate_results(results_dir, bin_size, window_size):
+def collate_results(results_dir, filename, bin_size, window_size):
     dfs = []
     for run in glob.glob(os.path.join(os.path.normpath(results_dir), '*')):
         print(f"Found {run}")
-        run_df = parse_filepath(run, bin_size, window_size)
+        run_df = parse_filepath(run, filename, bin_size, window_size)
         if run_df is None:
             continue
         dfs.append(run_df)
     return pd.concat(dfs, axis=0)
 
 
-def plot(data, hue, style, seed, savepath=None, show=True):
+def plot(data, x, y, hue, style, seed, savepath=None, show=True):
     print(f"Plotting using hue={hue}, style={style}, {seed}")
-
+    assert not data.empty, "DataFrame is empty, please check query"
     # If asking for multiple envs, use facetgrid and adjust height
     height = 3 if len(data['env'].unique()) > 2 else 5
     col_wrap = 2 if len(data['env'].unique()) > 1 else 1
@@ -55,8 +55,8 @@ def plot(data, hue, style, seed, savepath=None, show=True):
     palette = sns.color_palette(n_colors=len(data[hue].unique()))
 
     if isinstance(seed, list) or seed == 'average':
-        g = sns.relplot(x='episode',
-                        y='reward',
+        g = sns.relplot(x=x,
+                        y=y,
                         data=data,
                         hue=hue,
                         style=style,
@@ -70,8 +70,8 @@ def plot(data, hue, style, seed, savepath=None, show=True):
                         facet_kws={'sharey': False})
 
     elif seed == 'all':
-        g = sns.relplot(x='episode',
-                        y='reward',
+        g = sns.relplot(x=x,
+                        y=y,
                         data=data,
                         hue=hue,
                         units='seed',
@@ -105,12 +105,14 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # yapf: disable
-    parser.add_argument('--results-dir', help='Directory for results', default='results/pretraining',
-            required=False, type=str)
-    parser.add_argument('--create-csv', help='Create csv, overwrites if exists',
-            action='store_true')
+    parser.add_argument('--create-csv', help='Create csv, overwrites if exists', action='store_true')
     parser.add_argument('--bin-size', help='How much to reduce the data by', type=int, default=100)
     parser.add_argument('--window-size', help='How much to average the data by', type=int, default=100)
+    
+    parser.add_argument('--results-dir', help='Directory for results', required=True, type=str)
+    parser.add_argument('--filename', help='csv filename', required=True, type=str)
+    parser.add_argument('-x', help='Variable to plot on x axis', required=True, type=str)
+    parser.add_argument('-y', help='Variable to plot on y axis', required=True, type=str)
 
     parser.add_argument('--query', help='DF query string', type=str)
     parser.add_argument('--hue', help='Hue variable', type=str)
@@ -131,14 +133,14 @@ if __name__ == "__main__":
     if args.create_csv:
         print("Recreating csv in results directory")
         print(f"Binning by {args.bin_size}")
-        df = collate_results(args.results_dir, args.bin_size, args.window_size)
-        df.to_csv(os.path.join(args.results_dir, 'combined.csv'))
+        df = collate_results(args.results_dir, args.filename, args.bin_size, args.window_size)
+        df.to_csv(os.path.join(args.results_dir, 'combined_' + args.filename))
 
     if not args.no_plot:
         if args.save_path:
             os.makedirs(os.path.split(args.save_path)[0], exist_ok=True)
-        df = pd.read_csv(os.path.join(args.results_dir, 'combined.csv'))
+        df = pd.read_csv(os.path.join(args.results_dir, 'combined_' + args.filename))
         if args.query is not None:
             print(f"Filtering with {args.query}")
             df = df.query(args.query)
-        plot(df, args.hue, args.style, args.seed, savepath=args.save_path, show=(not args.no_show))
+        plot(df, args.x, args.y, args.hue, args.style, args.seed, savepath=args.save_path, show=(not args.no_show))
