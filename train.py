@@ -60,7 +60,9 @@ agent_args = {
     "model_type": args.model_type,
     "num_frames": args.num_frames,
     "mode":args.mode, #skyline,ling_prior,embed_bl,cnn
-    "hier":args.use_hier
+    "hier":args.use_hier,
+    "atten":args.atten,
+    "one_layer":args.one_layer
 }
 agent = DQN_agent(**agent_args)
 
@@ -184,7 +186,9 @@ while global_steps < args.max_steps:
     if len(agent.replay_buffer
           ) < args.batchsize or global_steps < args.warmup_period:
         continue
-
+    if episode % 500 == 0:
+       with open("embed_bl_{}".format(episode),'wb') as embed_file:
+          np.save(embed_file,agent.online.state_dict()['gcn.obj_emb.weight'].cpu().data.numpy())
     # Testing policy
     num_test = args.num_test_runs
     if episode % args.test_policy_episodes == 0:

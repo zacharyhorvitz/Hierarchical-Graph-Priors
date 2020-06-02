@@ -378,7 +378,8 @@ class DQN_agent:
                  model_type="mlp",
                  num_frames=None,
                  mode="skyline",
-                 hier=False):
+                 hier=False,
+                 atten=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)

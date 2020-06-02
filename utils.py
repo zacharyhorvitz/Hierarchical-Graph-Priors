@@ -159,8 +159,17 @@ def parse_args():
                         required=False)
     parser.add_argument('--mode',
                         help='select mode',
-                        choices=["skyline", "ling_prior","skyline_simple","embed_bl","cnn"],
+                        choices=["skyline", "ling_prior","skyline_simple","skyline_simple_trash","embed_bl","cnn"],
                         required=True)
+    parser.add_argument('--atten',
+                        help='Use block attention',
+                        action='store_true',
+                        required=False)
+    parser.add_argument('--one_layer',
+                        help='just compute attention over neighbors',
+                        action='store_true',
+                        required=False)
+
 
     return parser.parse_args()
 
