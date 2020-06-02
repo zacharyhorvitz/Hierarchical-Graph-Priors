@@ -506,8 +506,13 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             # ("water", "water_bucket_item")]
             latent_nodes = []
             use_graph = True
+        elif mode in ["cnn", "embed_bl"]:
+            use_graph = False
+            latent_nodes = []
+            edges = []
         else:
-            exit()
+            print("Invalid configuration")
+            sys.exit()
         # elif mode == "skyline" and hier:
         #     latent_nodes = ["edge_tool","non_edge_tool", "material"]
         #     edges = [ ("pickaxe","stone"),("axe","log"),("hoe","dirt"),("bucket","water"),("stone","cobblestone"),("dirt","farmland"),("water","water_bucket"), ("edge_tool", "pickaxe"), ("edge_tool", "axe"), ("non_edge_tool", "hoe"), ("non_edge_tool", "bucket"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water")]
