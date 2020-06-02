@@ -1,19 +1,19 @@
-import gym
-import numpy as np
 import random
-import torch
 import time
 import os
+import json
+
+import gym
+import numpy as np
+import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import parse_args, append_timestamp
 from model import DQN_agent, Experience
-#from model_multi import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
 from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
-
 
 args = parse_args()
 
@@ -29,14 +29,19 @@ np.random.seed(args.seed)
 
 run_tag = args.run_tag
 
-#env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address) 
+#env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address)
 if args.env == 'npy':
-    env = EnvNpy(random=True,mission=None) 
+    env = EnvNpy(random=True, mission=None)
+    test_env = EnvNpy(random=True, mission=None)
 elif args.env == 'malmo_server':
     assert args.address is not None
     assert args.port is not None
-    env = EnvMalmo(random=True,mission=None) 
-    #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address) 
+    env = EnvMalmo(random=True, mission=None)
+    test_env = EnvMalmo(random=True, mission=None)
+    #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address)
+
+env.seed(args.seed)
+test_env.seed(args.seed)
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
@@ -59,10 +64,10 @@ agent_args = {
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
     "num_frames": args.num_frames,
-    "mode":args.mode, #skyline,ling_prior,embed_bl,cnn
-    "hier":args.use_hier,
-    "atten":args.atten,
-    "one_layer":args.one_layer
+    "mode": args.mode,  #skyline,ling_prior,embed_bl,cnn
+    "hier": args.use_hier,
+    "atten": args.atten,
+    "one_layer": args.one_layer
 }
 agent = DQN_agent(**agent_args)
 
@@ -86,10 +91,19 @@ if args.output_path:
 
 # Logging via csv
 if args.output_path:
-    log_filename = "{args.output_path}/{run_tag}.csv"
+    base_filename = os.path.join(args.output_path, run_tag)
+    os.makedirs(base_filename, exist_ok=True)
+    log_filename = os.path.join(base_filename, 'reward.csv')
+    mission_filename = os.path.join(base_filename, 'mission_distribution.csv')
     with open(log_filename, "w") as f:
-        f.write("episode,global_steps,cumulative_reward,\n")
-        f.flush()
+        f.write("episode,steps,reward\n")
+    with open(mission_filename, "w") as f:
+        f.write("episode,steps,type,reward\n")
+    with open(os.path.join(base_filename, 'params.json'), 'w') as fp:
+        param_dict = vars(args).copy()
+        del param_dict['output_path']
+        del param_dict['model_path']
+        json.dump(param_dict, fp)
 else:
     log_filename = None
 
@@ -112,7 +126,9 @@ if args.load_checkpoint_path and checkpoint is not None:
     episode = checkpoint['episode']
 
 while global_steps < args.max_steps:
-    print(f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start)}")
+    print(
+        f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start)}"
+    )
     start = time.time()
     state = env.reset()
     done = False
@@ -132,8 +148,7 @@ while global_steps < args.max_steps:
         else:
             clipped_reward = reward
         agent.replay_buffer.append(
-            Experience(state, action, clipped_reward, next_state,
-                       int(done)))
+            Experience(state, action, clipped_reward, next_state, int(done)))
         state = next_state
 
         # If not enough data, try again
@@ -163,11 +178,11 @@ while global_steps < args.max_steps:
         optimizer.step()
         agent.sync_networks()
 
-        if args.model_path:
+        if args.model_path is not None:
             if global_steps % args.checkpoint_steps == 0:
-                for filename in os.listdir(f"{args.model_path}/"):
+                for filename in os.listdir(args.model_path):
                     if "checkpoint" in filename and run_tag in filename:
-                        os.remove(f"{args.model_path}/" + filename)
+                        os.remove(os.path.join(args.model_path, filename))
                 torch.save(
                     {
                         "global_steps": global_steps,
@@ -175,8 +190,62 @@ while global_steps < args.max_steps:
                         "optimizer_state_dict": optimizer.state_dict(),
                         "episode": episode,
                     },
-                    append_timestamp(f"{args.model_path}/checkpoint_{run_tag}")
+                    append_timestamp(
+                        os.path.join(args.model_path, f"checkpoint_{run_tag}"))
                     + f"_{global_steps}.tar")
+
+        # Testing policy
+        if global_steps % args.test_policy_steps == 0:
+            cumulative_reward = 0
+            mission_rewards = {k: 0 for k in env.mission_types}
+
+            for _ in range(args.num_test_runs):
+                test_reward = 0
+                with torch.no_grad():
+                    # Reset environment
+                    test_state = test_env.reset()
+                    test_action = agent.online.act(test_state, 0)
+                    test_done = False
+                    render = args.render and (episode %
+                                              args.render_episodes == 0)
+
+                    # Test episode loop
+                    while not test_done:
+                        # Take action in env
+                        if render:
+                            env.render()
+
+                        test_state, t_reward, test_done, info = test_env.step(
+                            test_action)
+                        test_action = agent.online.act(
+                            test_state, 0)  # passing in epsilon = 0
+                        # Update reward
+                        test_reward += t_reward
+
+                    print(f"{info['mission']}: {test_reward}")
+                    mission_rewards[info['mission']] += test_reward
+                    cumulative_reward += test_reward
+                    if render:
+                        test_env.close()  # close viewer
+
+            cumulative_reward /= args.num_test_runs
+            for k in mission_rewards.keys():
+                mission_rewards[k] /= args.num_test_runs
+            print(f"Policy_reward for test: {cumulative_reward}")
+
+            if not args.no_tensorboard:
+                writer.add_scalar('validation/policy_reward',
+                                  cumulative_reward / args.num_test_runs,
+                                  global_steps)
+
+            if log_filename:
+                with open(log_filename, "a") as f:
+                    f.write(f"{episode},{global_steps},{cumulative_reward}\n")
+
+            if mission_filename:
+                with open(mission_filename, "a") as f:
+                    for k, v in mission_rewards.items():
+                        f.write(f"{episode},{global_steps},{k},{v}\n")
 
     if not args.no_tensorboard:
         writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
@@ -186,49 +255,13 @@ while global_steps < args.max_steps:
     if len(agent.replay_buffer
           ) < args.batchsize or global_steps < args.warmup_period:
         continue
+
     #if episode % 500 == 0:
-       #with open("embed_bl_{}".format(episode),'wb') as embed_file:
-       #   np.save(embed_file,agent.online.state_dict()['gcn.obj_emb.weight'].cpu().data.numpy())
-    # Testing policy
-    num_test = args.num_test_runs
-    if episode % args.test_policy_episodes == 0:
-        cumulative_reward = 0
-        for _ in range(num_test):
-            test_reward = 0
-            with torch.no_grad():
-                # Reset environment
-                state = env.reset()
-                action = agent.online.act(state, 0)
-                done = False
-                render = args.render and (episode % args.render_episodes == 0)
-
-                # Test episode loop
-                while not done:
-                    # Take action in env
-                    if render:
-                        env.render()
-
-                    state, reward, done, info = env.step(action)
-                    action = agent.online.act(state, 0)  # passing in epsilon = 0
-                    # Update reward
-                    test_reward += reward
-                 
-                print(f"{info['mission']}: {test_reward}")
-                cumulative_reward += test_reward
-                env.close()  # close viewer
-        
-        print(f"Policy_reward for test: {cumulative_reward/num_test}")
-
-        if not args.no_tensorboard:
-            writer.add_scalar('validation/policy_reward', cumulative_reward / num_test, episode)
-
-        if log_filename:
-            with open(log_filename, "a") as f:
-                f.write(
-                    f"{episode},{global_steps},{cumulative_reward},\n")
-                f.flush()
+    #with open("embed_bl_{}".format(episode),'wb') as embed_file:
+    #   np.save(embed_file,agent.online.state_dict()['gcn.obj_emb.weight'].cpu().data.numpy())
 
 env.close()
 if args.model_path:
-    torch.save(agent.online,
-               append_timestamp(f"{args.model_path}/{run_tag}") + ".pth")
+    torch.save(
+        agent.online,
+        append_timestamp(os.path.join(args.model_path, run_tag)) + ".pth")

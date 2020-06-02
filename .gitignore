@@ -135,5 +135,9 @@ saved_models/
 profile.out
 .idea
 test.py
+*.tar
+*.pth
 
-MalmoPlatform/
+MalmoPlatform/ 
+logs/
+plots/
