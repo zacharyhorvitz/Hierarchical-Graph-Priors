@@ -232,13 +232,16 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
         game_nodes = sorted([k for k in object_to_char.keys() if k not in non_node_objects])
 
         if mode in ["both", "adv_graph", "val_graph"] and not hier:
-            noun_edges = [("pickaxe_item", "stone"), ("axe_item", "log"), ("log", "log_item"),
-                          ("hoe_item", "dirt"), ("bucket_item", "water"),
-                          ("stone", "cobblestone_item"), ("dirt", "farmland"),
-                          ("water", "water_bucket_item")]
+            # yapf: disable
+            noun_edges = [("pickaxe_item", "stone"), ("stone", "cobblestone_item"),
+                          ("axe_item", "log"), ("log", "log_item"),
+                          ("hoe_item", "dirt"), ("dirt", "farmland"),
+                          ("bucket_item", "water"), ("water", "water_bucket_item")]
             verb_edges = [("pickaxe_item", "attack_1"), ("attack_1", "stone"),
-                          ("axe_item", "attack_1"), ("attack_1", "log"), ("hoe_item", "use_1"),
-                          ("use_1", "dirt"), ("bucket_item", "use_1"), ("use_1", "water")]
+                          ("axe_item", "attack_1"), ("attack_1", "log"),
+                          ("hoe_item", "use_1"), ("use_1", "dirt"), 
+                          ("bucket_item", "use_1"), ("use_1", "water")]
+            # yapf: enable 
             edges = noun_edges + verb_edges
             latent_nodes = ['attack_1', 'use_1']
             use_graph = True
