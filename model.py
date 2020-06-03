@@ -161,7 +161,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         state_space,
         action_space,
         num_actions,
-        num_frames=4,
+        num_frames=1,
         final_dense_layer=50,
         input_shape=(9, 9),
         mode="skyline",  #skyline,ling_prior,embed_bl,cnn
@@ -261,7 +261,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             use_graph = True
         #else:
         #    exit()
-        elif mode == "skyline" and hier:
+        elif (mode == "skyline" and hier) or mode == "fully_connected":
              latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
              edges = [ ("pickaxe_item","stone"),("axe_item","log"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("log","log_item"),("dirt","farmland"),("water","water_bucket_item"), ("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
              use_graph = True
@@ -293,8 +293,9 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
              use_graph = False
              latent_nodes = []
              edges = []
-        # else:
-        #     print("Invalid configuration")
+        else:
+            print("Invalid configuration")
+            sys.exit()
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
@@ -315,6 +316,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         for s, d in edges:
             adjacency[name_2_node[d]][
                 name_2_node[s]] = 1.0  #corrected transpose!!!!
+        if mode == "fully_connected":
+            adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes)) 
 
         self.gcn = GCN(adjacency,
                        self.device,
