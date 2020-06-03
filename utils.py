@@ -160,7 +160,22 @@ def parse_args():
                         required=False)
     parser.add_argument('--mode',
                         help='select mode',
-                        choices=["skyline", "ling_prior","skyline_simple","skyline_simple_trash","embed_bl","cnn", "fully_connected"],
+                        choices=[
+                            # skyline varients
+                            "skyline",
+                            "skyline_hier",
+                            "skyline_atten",
+                            "skyline_hier_atten",
+                            # simple varients
+                            "skyline_simple",
+                            "skyline_simple_atten",
+                            # baselines
+                            "cnn",
+                            "fully_connected",
+                            # others
+                            "skyline_simple_trash",
+                            "embed_bl",
+                            "ling_prior"],
                         required=True)
     parser.add_argument('--atten',
                         help='Use block attention',

@@ -49,6 +49,12 @@ if args.gpu and torch.cuda.is_available():
 else:
     device = torch.device('cpu')
 
+if args.mode in ['skyline_simple'] or '_hier' in args.mode:
+    args.use_hier = True
+
+if '_atten' in args.mode:
+    args.atten = True
+
 # Initialize model
 agent_args = {
     "device": device,
@@ -113,6 +119,8 @@ if not args.no_tensorboard:
         writer = SummaryWriter(args.output_path)
     else:
         writer = SummaryWriter(comment=args.env)
+else:
+    writer = None
 
 # Episode loop
 global_steps = 0
