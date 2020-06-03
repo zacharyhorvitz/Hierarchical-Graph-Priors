@@ -1,8 +1,9 @@
 import torch
+import sys
 import numpy as np
 import random
 from collections import deque, namedtuple
-import torch.nn.functional as F 
+import torch.nn.functional as F
 
 from utils import sync_networks, conv2d_size_out
 
@@ -86,25 +87,25 @@ class GCN(torch.nn.Module):
         A_raw = adj_mat  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
         self.A = A_raw.to(device)  #normalize_adj(A_raw).tocsr().toarray().to(device)
         self.use_graph = use_graph
-        self.atten = atten 
+        self.atten = atten
         self.one_layer = one_layer
 
         if self.use_graph:
             print("Using graph network")
-            self.W0 = torch.nn.Linear(self.emb_sz, 16, bias=False) if not self.one_layer else torch.nn.Linear(self.emb_sz, self.emb_sz, bias=False)  
+            self.W0 = torch.nn.Linear(self.emb_sz, 16, bias=False) if not self.one_layer else torch.nn.Linear(self.emb_sz, self.emb_sz, bias=False)
             self.W1 = torch.nn.Linear(16, 16, bias=False)
             self.W2 = torch.nn.Linear(16, 16, bias=False)
             self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
             self.final_mapping = torch.nn.Linear(16, self.emb_sz)
-            #self.mask = self.A.detach() 
-            
+            #self.mask = self.A.detach()
+
             if self.atten:
                 self.attention = torch.nn.Parameter(self.A.detach(), requires_grad=True)
                 #self.mask = (~self.A.long())*float('-inf')
                 print("USING ATTENTION")
-           # else:
-            #    self.atten = self.A #torch.Variable(self.A.detach(), requires_grad=True)
-           
+        # else:
+        #    self.atten = self.A #torch.Variable(self.A.detach(), requires_grad=True)
+
 
         self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
         #self.s_max = torch.nn.Softmax(dim=1)
@@ -115,8 +116,8 @@ class GCN(torch.nn.Module):
         node_embeddings = self.get_node_emb(self.nodes)
 
         if self.atten:
-             weighting = F.normalize(self.attention * self.A)
-        else: weighting = self.A     
+            weighting = F.normalize(self.attention * self.A)
+        else: weighting = self.A
         x = torch.mm(weighting , node_embeddings)
         x = torch.nn.functional.relu(self.W0(x)) #later fix to do relu after
         if not self.one_layer:
@@ -243,56 +244,56 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             "water_bucket_item": 12,
             "log_item": 13,
             "dirt_item": 14,
-            "farmland_item":15
+            "farmland_item": 15
         }
         #object_to_char = {"air":0,"bedrock":1,"stone":2,"pickaxe_item":3,"cobblestone_item":4,"log":5,"axe_item":6,"dirt":7,"farmland":8,"hoe_item":9,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
         non_node_objects = ["air", "wall"]
         game_nodes = sorted(
             [k for k in object_to_char.keys() if k not in non_node_objects])
 
-        if mode == "skyline" and not hier:
+        if mode in ["skyline", "skyline_atten"] and not hier:
             # edges = [ ("pickaxe","stone"),("axe","log"),("hoe","dirt"),("bucket","water"),("stone","cobblestone"),("dirt","farmland"),("water","water_bucket")]
             edges = [ ("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
             # edges = [("pickaxe_item", "stone"), ("axe_item", "log"),
-                     # ("hoe_item", "dirt"), ("bucket_item", "water"),
-                     # ("stone", "cobblestone_item"), ("dirt", "farmland"),
-                     # ("water", "water_bucket_item")]
+            # ("hoe_item", "dirt"), ("bucket_item", "water"),
+            # ("stone", "cobblestone_item"), ("dirt", "farmland"),
+            # ("water", "water_bucket_item")]
             latent_nodes = []
             use_graph = True
         #else:
         #    exit()
-        elif (mode == "skyline" and hier) or mode == "fully_connected":
-             latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
-             edges = [ ("pickaxe_item","stone"),("axe_item","log"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("log","log_item"),("dirt","farmland"),("water","water_bucket_item"), ("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
-             use_graph = True
+        elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"]:
+            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
+            edges = [ ("pickaxe_item","stone"),("axe_item","log"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("log","log_item"),("dirt","farmland"),("water","water_bucket_item"), ("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
+            use_graph = True
 
-        elif mode == "skyline_simple" and hier:
-             latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
-             edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
-             use_graph = True
+        elif mode in ["skyline_simple", "skyline_simple_atten"]:
+            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
+            edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
+            use_graph = True
         elif mode == "skyline_simple_trash" and hier:
-             latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
-             edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item"),("product","hoe_item")]
-             use_graph = True
+            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
+            edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item"),("product","hoe_item")]
+            use_graph = True
 
         elif mode == "ling_prior" and hier:
-             use_graph = True
-             latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
-           
-             edges = [('substance', 'stone'), ('object', 'stone'), ('stone', 'stone'), ('material', 'stone'), ('artifact', 'stone'), ('bucket_item', 'bucket_item'), ('instrumentality', 'bucket_item'), ('abstraction', 'bucket_item'), ('object', 'bucket_item'), ('artifact', 'bucket_item'), ('hoe_item', 'hoe_item'), ('physical_entity', 'hoe_item'), ('tool', 'hoe_item'), ('instrumentality', 'hoe_item'), ('object', 'hoe_item'), ('artifact', 'hoe_item'), ('physical_entity', 'pickaxe_item'), ('tool', 'pickaxe_item'), ('pickaxe_item', 'pickaxe_item'), ('instrumentality', 'pickaxe_item'), ('edge_tool', 'pickaxe_item'), ('object', 'pickaxe_item'), ('artifact', 'pickaxe_item'), ('physical_entity', 'axe_item'), ('axe_item', 'axe_item'), ('tool', 'axe_item'), ('instrumentality', 'axe_item'), ('edge_tool', 'axe_item'), ('object', 'axe_item'), ('artifact', 'axe_item'), ('water_bucket_item', 'water_bucket_item'), ('physical_entity', 'log'), ('log', 'log'), ('substance', 'log'), ('instrumentality', 'log'), ('material', 'log'), ('artifact', 'log'), ('farmland', 'farmland'), ('physical_entity', 'farmland'), ('object', 'farmland'), ('physical_entity', 'water'), ('substance', 'water'), ('water', 'water'), ('body_waste', 'water'), ('artifact', 'water'), ('physical_entity', 'dirt'), ('dirt', 'dirt'), ('abstraction', 'dirt'), ('body_waste', 'dirt'), ('material', 'dirt'), ('cobblestone_item', 'cobblestone_item'), ('dirt_item', 'dirt_item'), ('log_item', 'log_item'), ('farmland_item', 'farmland_item')]
+            use_graph = True
+            latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
+
+            edges = [('substance', 'stone'), ('object', 'stone'), ('stone', 'stone'), ('material', 'stone'), ('artifact', 'stone'), ('bucket_item', 'bucket_item'), ('instrumentality', 'bucket_item'), ('abstraction', 'bucket_item'), ('object', 'bucket_item'), ('artifact', 'bucket_item'), ('hoe_item', 'hoe_item'), ('physical_entity', 'hoe_item'), ('tool', 'hoe_item'), ('instrumentality', 'hoe_item'), ('object', 'hoe_item'), ('artifact', 'hoe_item'), ('physical_entity', 'pickaxe_item'), ('tool', 'pickaxe_item'), ('pickaxe_item', 'pickaxe_item'), ('instrumentality', 'pickaxe_item'), ('edge_tool', 'pickaxe_item'), ('object', 'pickaxe_item'), ('artifact', 'pickaxe_item'), ('physical_entity', 'axe_item'), ('axe_item', 'axe_item'), ('tool', 'axe_item'), ('instrumentality', 'axe_item'), ('edge_tool', 'axe_item'), ('object', 'axe_item'), ('artifact', 'axe_item'), ('water_bucket_item', 'water_bucket_item'), ('physical_entity', 'log'), ('log', 'log'), ('substance', 'log'), ('instrumentality', 'log'), ('material', 'log'), ('artifact', 'log'), ('farmland', 'farmland'), ('physical_entity', 'farmland'), ('object', 'farmland'), ('physical_entity', 'water'), ('substance', 'water'), ('water', 'water'), ('body_waste', 'water'), ('artifact', 'water'), ('physical_entity', 'dirt'), ('dirt', 'dirt'), ('abstraction', 'dirt'), ('body_waste', 'dirt'), ('material', 'dirt'), ('cobblestone_item', 'cobblestone_item'), ('dirt_item', 'dirt_item'), ('log_item', 'log_item'), ('farmland_item', 'farmland_item')]
 
 # edges = [('object', 'stone'), ('material', 'stone'), ('substance', 'stone'), ('artifact', 'stone'), ('stone', 'stone'), ('object', 'bucket_item'), ('abstraction', 'bucket_item'), ('artifact', 'bucket_item'), ('instrumentality', 'bucket_item'), ('bucket_item', 'bucket_item'), ('physical_entity', 'hoe_item'), ('object', 'hoe_item'), ('hoe_item', 'hoe_item'), ('artifact', 'hoe_item'), ('tool', 'hoe_item'), ('instrumentality', 'hoe_item'), ('physical_entity', 'pickaxe_item'), ('object', 'pickaxe_item'), ('artifact', 'pickaxe_item'), ('tool', 'pickaxe_item'), ('edge_tool', 'pickaxe_item'), ('pickaxe_item', 'pickaxe_item'), ('instrumentality', 'pickaxe_item'), ('physical_entity', 'axe_item'), ('object', 'axe_item'), ('axe_item', 'axe_item'), ('artifact', 'axe_item'), ('tool', 'axe_item'), ('edge_tool', 'axe_item'), ('instrumentality', 'axe_item'), ('water_bucket_item', 'water_bucket_item'), ('physical_entity', 'log'), ('material', 'log'), ('substance', 'log'), ('artifact', 'log'), ('log', 'log'), ('instrumentality', 'log'), ('farmland', 'farmland'), ('physical_entity', 'farmland'), ('object', 'farmland'), ('physical_entity', 'cobblestone'), ('object', 'cobblestone'), ('artifact', 'cobblestone'), ('cobblestone', 'cobblestone'), ('stone', 'cobblestone'), ('physical_entity', 'water'), ('substance', 'water'), ('artifact', 'water'), ('body_waste', 'water'), ('water', 'water'), ('physical_entity', 'dirt'), ('abstraction', 'dirt'), ('material', 'dirt'), ('dirt', 'dirt'), ('body_waste', 'dirt'), ('cobblestone_item', 'cobblestone_item'), ('dirt_item', 'dirt_item'), ('log_item', 'log_item'), ('farmland_item', 'farmland_item')]
 
 
 
 
-        #      latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
-        #     edges = [('farmland', 'farmland'), ('farmland', 'physical_entity'), ('farmland', 'object'), ('abstraction', 'abstraction'), ('abstraction', 'bucket'), ('abstraction', 'dirt'), ('substance', 'substance'), ('substance', 'stone'), ('substance', 'log'), ('substance', 'water'), ('cobblestone', 'cobblestone'), ('cobblestone', 'stone'), ('cobblestone', 'artifact'), ('cobblestone', 'physical_entity'), ('cobblestone', 'object'), ('axe', 'axe'), ('axe', 'artifact'), ('axe', 'physical_entity'), ('axe', 'object'), ('axe', 'edge_tool'), ('axe', 'tool'), ('axe', 'instrumentality'), ('stone', 'substance'), ('stone', 'cobblestone'), ('stone', 'stone'), ('stone', 'artifact'), ('stone', 'dirt'), ('stone', 'water'), ('stone', 'material'), ('stone', 'object'), ('artifact', 'substance'), ('artifact', 'cobblestone'), ('artifact', 'axe'), ('artifact', 'stone'), ('artifact', 'artifact'), ('artifact', 'bucket'), ('artifact', 'log'), ('artifact', 'hoe'), ('artifact', 'water'), ('artifact', 'pickaxe'), ('bucket', 'abstraction'), ('bucket', 'artifact'), ('bucket', 'bucket'), ('bucket', 'object'), ('bucket', 'instrumentality'), ('dirt', 'abstraction'), ('dirt', 'dirt'), ('dirt', 'physical_entity'), ('dirt', 'body_waste'), ('dirt', 'material'), ('physical_entity', 'farmland'), ('physical_entity', 'cobblestone'), ('physical_entity', 'axe'), ('physical_entity', 'dirt'), ('physical_entity', 'physical_entity'), ('physical_entity', 'log'), ('physical_entity', 'hoe'), ('physical_entity', 'water'), ('physical_entity', 'pickaxe'), ('log', 'substance'), ('log', 'artifact'), ('log', 'physical_entity'), ('log', 'log'), ('log', 'material'), ('log', 'instrumentality'), ('hoe', 'artifact'), ('hoe', 'physical_entity'), ('hoe', 'hoe'), ('hoe', 'object'), ('hoe', 'tool'), ('hoe', 'instrumentality'), ('body_waste', 'dirt'), ('body_waste', 'body_waste'), ('body_waste', 'water'), ('water', 'substance'), ('water', 'artifact'), ('water', 'physical_entity'), ('water', 'body_waste'), ('water', 'water'), ('material', 'substance'), ('material', 'stone'), ('material', 'dirt'), ('material', 'log'), ('material', 'material'), ('object', 'farmland'), ('object', 'cobblestone'), ('object', 'axe'), ('object', 'stone'), ('object', 'bucket'), ('object', 'hoe'), ('object', 'object'), ('object', 'pickaxe'), ('edge_tool', 'axe'), ('edge_tool', 'edge_tool'), ('edge_tool', 'pickaxe'), ('tool', 'axe'), ('tool', 'hoe'), ('tool', 'object'), ('tool', 'tool'), ('tool', 'pickaxe'), ('pickaxe', 'artifact'), ('pickaxe', 'physical_entity'), ('pickaxe', 'object'), ('pickaxe', 'edge_tool'), ('pickaxe', 'tool'), ('pickaxe', 'pickaxe'), ('pickaxe', 'instrumentality'), ('instrumentality', 'axe'), ('instrumentality', 'bucket'), ('instrumentality', 'log'), ('instrumentality', 'hoe'), ('instrumentality', 'pickaxe'), ('instrumentality', 'instrumentality'), ('water_bucket', 'water_bucket')]
-        #     use_graph = True
+#      latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
+#     edges = [('farmland', 'farmland'), ('farmland', 'physical_entity'), ('farmland', 'object'), ('abstraction', 'abstraction'), ('abstraction', 'bucket'), ('abstraction', 'dirt'), ('substance', 'substance'), ('substance', 'stone'), ('substance', 'log'), ('substance', 'water'), ('cobblestone', 'cobblestone'), ('cobblestone', 'stone'), ('cobblestone', 'artifact'), ('cobblestone', 'physical_entity'), ('cobblestone', 'object'), ('axe', 'axe'), ('axe', 'artifact'), ('axe', 'physical_entity'), ('axe', 'object'), ('axe', 'edge_tool'), ('axe', 'tool'), ('axe', 'instrumentality'), ('stone', 'substance'), ('stone', 'cobblestone'), ('stone', 'stone'), ('stone', 'artifact'), ('stone', 'dirt'), ('stone', 'water'), ('stone', 'material'), ('stone', 'object'), ('artifact', 'substance'), ('artifact', 'cobblestone'), ('artifact', 'axe'), ('artifact', 'stone'), ('artifact', 'artifact'), ('artifact', 'bucket'), ('artifact', 'log'), ('artifact', 'hoe'), ('artifact', 'water'), ('artifact', 'pickaxe'), ('bucket', 'abstraction'), ('bucket', 'artifact'), ('bucket', 'bucket'), ('bucket', 'object'), ('bucket', 'instrumentality'), ('dirt', 'abstraction'), ('dirt', 'dirt'), ('dirt', 'physical_entity'), ('dirt', 'body_waste'), ('dirt', 'material'), ('physical_entity', 'farmland'), ('physical_entity', 'cobblestone'), ('physical_entity', 'axe'), ('physical_entity', 'dirt'), ('physical_entity', 'physical_entity'), ('physical_entity', 'log'), ('physical_entity', 'hoe'), ('physical_entity', 'water'), ('physical_entity', 'pickaxe'), ('log', 'substance'), ('log', 'artifact'), ('log', 'physical_entity'), ('log', 'log'), ('log', 'material'), ('log', 'instrumentality'), ('hoe', 'artifact'), ('hoe', 'physical_entity'), ('hoe', 'hoe'), ('hoe', 'object'), ('hoe', 'tool'), ('hoe', 'instrumentality'), ('body_waste', 'dirt'), ('body_waste', 'body_waste'), ('body_waste', 'water'), ('water', 'substance'), ('water', 'artifact'), ('water', 'physical_entity'), ('water', 'body_waste'), ('water', 'water'), ('material', 'substance'), ('material', 'stone'), ('material', 'dirt'), ('material', 'log'), ('material', 'material'), ('object', 'farmland'), ('object', 'cobblestone'), ('object', 'axe'), ('object', 'stone'), ('object', 'bucket'), ('object', 'hoe'), ('object', 'object'), ('object', 'pickaxe'), ('edge_tool', 'axe'), ('edge_tool', 'edge_tool'), ('edge_tool', 'pickaxe'), ('tool', 'axe'), ('tool', 'hoe'), ('tool', 'object'), ('tool', 'tool'), ('tool', 'pickaxe'), ('pickaxe', 'artifact'), ('pickaxe', 'physical_entity'), ('pickaxe', 'object'), ('pickaxe', 'edge_tool'), ('pickaxe', 'tool'), ('pickaxe', 'pickaxe'), ('pickaxe', 'instrumentality'), ('instrumentality', 'axe'), ('instrumentality', 'bucket'), ('instrumentality', 'log'), ('instrumentality', 'hoe'), ('instrumentality', 'pickaxe'), ('instrumentality', 'instrumentality'), ('water_bucket', 'water_bucket')]
+#     use_graph = True
         elif mode == "cnn" or mode == "embed_bl":
-             use_graph = False
-             latent_nodes = []
-             edges = []
+            use_graph = False
+            latent_nodes = []
+            edges = []
         else:
             print("Invalid configuration")
             sys.exit()
@@ -309,15 +310,15 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         print("Latent Nodes:", latent_nodes)
         print("Edges:", edges)
 
-        adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes)) 
-        #if "simple" in mode: adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes)) 
+        adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
+        #if "simple" in mode: adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes))
         for i in range(num_nodes):
             adjacency[i][i] = 1.0
         for s, d in edges:
             adjacency[name_2_node[d]][
                 name_2_node[s]] = 1.0  #corrected transpose!!!!
         if mode == "fully_connected":
-            adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes)) 
+            adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes))
 
         self.gcn = GCN(adjacency,
                        self.device,
@@ -337,7 +338,13 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
 
         #print(self.mode,self.hier)
 
-        if self.mode == "skyline" or self.mode == "ling_prior" or self.mode == "skyline_simple" or self.mode == "skyline_simple_trash":
+        graph_modes = [
+                "skyline", "skyline_hier", "skyline_atten",
+                "skyline_hier_atten", "skyline_simple", "skyline_simple_atten",
+                "skyline_simple_trash", "ling_prior", "fully_connected"
+        ]
+
+        if self.mode in graph_modes:
             state, node_embeds = self.gcn.embed_state(state.long())
             #   print(state.shape)
             cnn_output = self.body(state)
@@ -362,7 +369,9 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             goal_embeddings = self.gcn.obj_emb(goals)
             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
             q_value = self.head(cnn_output)
-
+        else:
+            print("Invalid mode")
+            sys.exit()
         return q_value
 
     def act(self, state, epsilon):

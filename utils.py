@@ -77,7 +77,7 @@ def parse_args():
     parser.add_argument('--num-frames',
                         help='Number of frames to stack (CNN only)',
                         type=int,
-                        default=1,
+                        default=4,
                         required=False)
     parser.add_argument('--max-steps',
                         help='Number of steps to run for',

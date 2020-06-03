@@ -55,6 +55,9 @@ if args.mode in ['skyline_simple'] or '_hier' in args.mode:
 if '_atten' in args.mode:
     args.atten = True
 
+if args.mode == 'cnn':
+    args.num_frames = 1
+
 # Initialize model
 agent_args = {
     "device": device,
@@ -115,12 +118,10 @@ else:
 
 # Logging for tensorboard
 if not args.no_tensorboard:
-    if args.output_path:
-        writer = SummaryWriter(args.output_path)
-    else:
-        writer = SummaryWriter(comment=args.env)
+    writer = SummaryWriter(comment=run_tag)
 else:
     writer = None
+
 
 # Episode loop
 global_steps = 0
