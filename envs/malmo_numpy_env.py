@@ -14,7 +14,7 @@ class MalmoEnvSpecial(gym.Env):
 
         self.actions = [
             "movenorth", "movesouth", "movewest", "moveeast", "attack 0",
-            "attack 1", "use 0", "use 1"
+            "attack 1", "use 0", "use 1", "noop"
         ]
         self.action_space = Discrete(len(self.actions))
         self.mission_types = [

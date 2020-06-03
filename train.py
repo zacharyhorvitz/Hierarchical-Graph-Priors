@@ -14,6 +14,7 @@ from model import DQN_agent, Experience
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
 from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
+from envs.gym_wrappers import FakeActions
 
 args = parse_args()
 
@@ -33,12 +34,18 @@ run_tag = args.run_tag
 if args.env == 'npy':
     env = EnvNpy(random=True, mission=None)
     test_env = EnvNpy(random=True, mission=None)
+elif 'npy_fakeactions_' in args.env:
+    num_new_actions = int(args.env.replace('npy_fakeactions_', ''))
+    env = FakeActions(EnvNpy(random=True, mission=None), num_new_actions)
+    test_env = FakeActions(EnvNpy(random=True, mission=None), num_new_actions)
 elif args.env == 'malmo_server':
     assert args.address is not None
     assert args.port is not None
     env = EnvMalmo(random=True, mission=None)
     test_env = EnvMalmo(random=True, mission=None)
     #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address)
+else:
+    raise ValueError("Unrecognized env: {}".format(args.env))
 
 env.seed(args.seed)
 test_env.seed(args.seed)

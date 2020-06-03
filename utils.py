@@ -14,7 +14,6 @@ def parse_args():
     parser.add_argument('--env',
                         help='The malmo environment to train on',
                         type=str,
-                        choices=['npy', 'malmo_server'],
                         default='npy',
                         required=True)
     parser.add_argument('--run-tag',
@@ -27,6 +26,10 @@ def parse_args():
                         required=False)
     parser.add_argument('--port',
                         help='Port',
+                        type=int,
+                        required=False)
+    parser.add_argument('--num-fake-actions',
+                        help='Number of fake actions',
                         type=int,
                         required=False)
     parser.add_argument('--model-type',
