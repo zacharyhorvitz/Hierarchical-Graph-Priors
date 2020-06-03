@@ -141,3 +141,4 @@ test.py
 MalmoPlatform/ 
 logs/
 plots/
+slurm/
