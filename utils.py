@@ -161,12 +161,12 @@ def parse_args():
     parser.add_argument('--mode',
                         help='select mode',
                         choices=[
-                            # skyline varients
+                            # skyline variants
                             "skyline",
                             "skyline_hier",
                             "skyline_atten",
                             "skyline_hier_atten",
-                            # simple varients
+                            # simple variants
                             "skyline_simple",
                             "skyline_simple_atten",
                             # baselines
