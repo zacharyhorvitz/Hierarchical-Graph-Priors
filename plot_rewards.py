@@ -52,7 +52,7 @@ def plot(data, x, y, hue, style, seed, savepath=None, show=True):
     height = 3 if len(data['env'].unique()) > 2 else 5
     col_wrap = 2 if len(data['env'].unique()) > 1 else 1
 
-    palette = sns.color_palette(n_colors=len(data[hue].unique()))
+    palette = sns.color_palette('Set1', n_colors=len(data[hue].unique()), desat=0.5)
 
     if isinstance(seed, list) or seed == 'average':
         g = sns.relplot(x=x,
@@ -110,9 +110,9 @@ def parse_args():
     parser.add_argument('--window-size', help='How much to average the data by', type=int, default=100)
     
     parser.add_argument('--results-dir', help='Directory for results', required=True, type=str)
-    parser.add_argument('--filename', help='csv filename', required=True, type=str)
-    parser.add_argument('-x', help='Variable to plot on x axis', required=True, type=str)
-    parser.add_argument('-y', help='Variable to plot on y axis', required=True, type=str)
+    parser.add_argument('--filename', help='csv filename', required=False, type=str)
+    parser.add_argument('-x', help='Variable to plot on x axis', required=False, type=str)
+    parser.add_argument('-y', help='Variable to plot on y axis', required=False, type=str)
 
     parser.add_argument('--query', help='DF query string', type=str)
     parser.add_argument('--hue', help='Hue variable', type=str)
@@ -133,10 +133,12 @@ if __name__ == "__main__":
     if args.create_csv:
         print("Recreating csv in results directory")
         print(f"Binning by {args.bin_size}")
+        assert args.filename is not None, "Must pass filename if creating csv"
         df = collate_results(args.results_dir, args.filename, args.bin_size, args.window_size)
         df.to_csv(os.path.join(args.results_dir, 'combined_' + args.filename))
 
     if not args.no_plot:
+        assert args.x is not None and args.y is not None, "Must pass x, y if creating csv"
         if args.save_path:
             os.makedirs(os.path.split(args.save_path)[0], exist_ok=True)
         df = pd.read_csv(os.path.join(args.results_dir, 'combined_' + args.filename))
