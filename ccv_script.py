@@ -54,6 +54,7 @@ def parse_args(custom_args=None):
     parser.add_argument('-y','--dry_run', action='store_true',
                         help="Don't actually submit jobs to slurm")
     parser.set_defaults(dry_run=False)
+    parser.add_argument('--account', type=str, default=None, help='account to run under')
     parser.add_argument('--email', type=str, default=None,
                         help='Email address(es) to notify when job is complete:'
                              ' addr1@brown.edu[, addr2@brown.edu]')
@@ -142,6 +143,9 @@ source {}
         'vlong': '7-00:00:00',  # 1 week
     }
     cmd += '-t {} '.format(duration_map[args.duration])
+
+    if args.account:
+        cmd += '--account {} '.format(args.account)
 
     # Number of CPU/GPU resources
     cmd += '-n {} '.format(args.cpus)
