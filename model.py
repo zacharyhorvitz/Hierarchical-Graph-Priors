@@ -4,6 +4,7 @@ import numpy as np
 import random
 from collections import deque, namedtuple
 import torch.nn.functional as F
+from torch.nn.functional import relu
 
 from utils import sync_networks, conv2d_size_out
 
@@ -55,85 +56,94 @@ class DQN_Base_model(torch.nn.Module):
 class GCN(torch.nn.Module):
 
     def __init__(self,
-                 adj_mat,
+                 adj_matrices,
                  device,
                  num_nodes,
                  num_types,
                  idx_2_game_char,
                  embed_wall=False,
-                 use_graph=True,atten=False, one_layer=False):
+                 use_graph=True,
+                 atten=False, 
+                 one_layer=False,
+                 emb_size=16):
         super(GCN, self).__init__()
 
         print("starting init")
         # n = 5
         self.n = num_nodes  #n
         self.num_types = num_types
-        self.emb_sz = 4
+        self.emb_sz = emb_size
         if embed_wall:
             self.wall_embed = torch.FloatTensor(torch.ones(
                 self.emb_sz)).to(device)
         else:
             self.wall_embed = None
-
-
-
+        self.atten = atten
         self.nodes = torch.arange(0, self.n)
         self.nodes = self.nodes.to(device)
         self.node_to_game_char = idx_2_game_char  #{i:i+1 for i in self.objects.tolist()}
         self.game_char_to_node = {
             v: k for k, v in self.node_to_game_char.items()
         }
-        # get and normalize adjacency matrix.
-        A_raw = adj_mat  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
-        self.A = A_raw.to(device)  #normalize_adj(A_raw).tocsr().toarray().to(device)
+        self.num_types=num_types
+        A_raw = adj_matrices  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
+        self.A = [x.to(device) for x in A_raw] #normalize_adj(A_raw).tocsr().toarray().to(device)
         self.use_graph = use_graph
-        self.atten = atten
-        self.one_layer = one_layer
-
+        self.num_edges = len(A_raw)
         if self.use_graph:
-            print("Using graph network")
-            self.W0 = torch.nn.Linear(self.emb_sz, 16, bias=False) if not self.one_layer else torch.nn.Linear(self.emb_sz, self.emb_sz, bias=False)
-            self.W1 = torch.nn.Linear(16, 16, bias=False)
-            self.W2 = torch.nn.Linear(16, 16, bias=False)
-            self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
-            self.final_mapping = torch.nn.Linear(16, self.emb_sz)
-            #self.mask = self.A.detach()
-
             if self.atten:
-                self.attention = torch.nn.Parameter(self.A.detach(), requires_grad=True)
-                #self.mask = (~self.A.long())*float('-inf')
-                print("USING ATTENTION")
-        # else:
-        #    self.atten = self.A #torch.Variable(self.A.detach(), requires_grad=True)
+                print('Using attention')
+                self.attention = torch.nn.ParameterList([torch.nn.Parameter(A.detach(), requires_grad=True) for A in A_raw])
+            #for i in range(self.num_edges):
+             #   self.add_module(str("atten_"+str(i)),self.attention[i])
 
 
-        self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
-        #self.s_max = torch.nn.Softmax(dim=1)
 
+
+            #self.num_edges = len(A_raw)
+            self.layer_sizes = [(4,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges)]
+            self.num_layers = len(self.layer_sizes)
+            self.weights = [[torch.nn.Linear(in_dim,out_dim,bias=False).to(device) for (in_dim,out_dim) in self.layer_sizes] for e in range(self.num_edges)]
+            for i in range(self.num_edges):   
+                for j in range(self.num_layers):  
+                     self.add_module(str((i,j)),self.weights[i][j])           
+        #weights = types x num_layers
+    #alternative, define matrix
+           # for e in self.edge_param:
+           #     e.W0 = torch.nn.Linear(self.emb_sz, 16, bias=False)
+        #e.combine0 = 
+            #    e.W1 = torch.nn.Linear(16, 16, bias=False)
+       #         e.W2 = torch.nn.Linear(16, 16, bias=False)
+            self.get_node_emb = torch.nn.Embedding(self.n, 4)#self.emb_sz)
+            #self.final_mapping = torch.nn.Linear(self.emb_sz, self.emb_sz)
+            self.state_mapping = torch.nn.Linear(self.emb_sz,4)
+        self.obj_emb = torch.nn.Embedding(self.num_types, 4)
         print("finished initializing")
-
     def gcn_embed(self):
         node_embeddings = self.get_node_emb(self.nodes)
-
-        if self.atten:
-            weighting = F.normalize(self.attention * self.A)
-        else: weighting = self.A
-        x = torch.mm(weighting , node_embeddings)
-        x = torch.nn.functional.relu(self.W0(x)) #later fix to do relu after
-        if not self.one_layer:
-            x = torch.mm(weighting , x)
-            x = torch.nn.functional.relu(self.W1(x))
-            x = torch.mm(weighting , x)
-            x = torch.nn.functional.relu(self.W2(x))
-            x = self.final_mapping(x)
+    #make size 16, first layer
+        x = node_embeddings
+        for l in range(self.num_layers):
+            layer_out = []
+            for e in range(self.num_edges):
+                 if self.atten:
+                     weighting = F.normalize(self.attention[e] * self.A[e]) 
+                 else:
+                     weighting = F.normalize(self.A[e])
+          #       print(e)
+         #        print(self.A[e])
+           #      print(x)
+                 layer_out.append(torch.mm(weighting, x))#)
+            x = torch.cat([relu(self.weights[e][l](type_features))  for e,type_features in enumerate(layer_out)],axis=1)
+            #x = torch.cat([self.weights[e][l](type_features) for e,type_features in enumerate(layer_out)],axis=1)
+        #x = self.final_mapping(x)
         return x
-
     def embed_state(self, game_state):
         game_state_embed = self.obj_emb(
             game_state.view(-1, game_state.shape[-2] * game_state.shape[-1]))
         game_state_embed = game_state_embed.view(-1, game_state.shape[-2],
                                                  game_state.shape[-1],
-                                                 self.emb_sz)
+                                                 4)
 
         if self.wall_embed:
             indx = (game_state == 1).nonzero()
@@ -144,7 +154,10 @@ class GCN(torch.nn.Module):
         if self.use_graph:
             # print("USING GRAPHS!!!!!")
             node_embeddings = self.gcn_embed()
-            for n, embedding in zip(self.nodes.tolist(), node_embeddings):
+            #print('node embeddings size:', node_embeddings.shape)
+            node_embeddings_shrunk = self.state_mapping(relu(node_embeddings))
+            #print('node_emb_shrunk_sz:', node_embeddings_shrunk.shape)
+            for n, embedding in zip(self.nodes.tolist(), node_embeddings_shrunk):
                 if n in self.node_to_game_char:
                     indx = (game_state == self.node_to_game_char[n]).nonzero()
                     game_state_embed[indx[:, 0], indx[:, 1],
@@ -166,7 +179,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         final_dense_layer=50,
         input_shape=(9, 9),
         mode="skyline",  #skyline,ling_prior,embed_bl,cnn
-        hier=False,atten=False, one_layer=False):
+        hier=False,atten=False, one_layer=False, emb_size=16):
         """Defining DQN CNN model
         """
         # initialize all parameters
@@ -180,6 +193,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         self.mode = mode
         self.atten = atten
         self.hier = hier
+        self.emb_size = emb_size
 
         print("building model")
         self.build_model()
@@ -205,7 +219,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
 
         self.head = torch.nn.Sequential(*[
             torch.nn.Linear(final_size[0] * final_size[1] * 32 +
-                            4, self.final_dense_layer),
+                            self.emb_size, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
@@ -310,22 +324,22 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         print("Latent Nodes:", latent_nodes)
         print("Edges:", edges)
 
-        adjacency = torch.FloatTensor(torch.zeros(num_nodes, num_nodes))
+        adjacency = torch.FloatTensor(torch.zeros(1,num_nodes, num_nodes))
         #if "simple" in mode: adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes))
         for i in range(num_nodes):
-            adjacency[i][i] = 1.0
+            adjacency[0][i][i] = 1.0
         for s, d in edges:
-            adjacency[name_2_node[d]][
+            adjacency[0][name_2_node[d]][
                 name_2_node[s]] = 1.0  #corrected transpose!!!!
         if mode == "fully_connected":
-            adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes))
+            adjacency = torch.FloatTensor(torch.ones(1,num_nodes, num_nodes))
 
         self.gcn = GCN(adjacency,
                        self.device,
                        num_nodes,
                        total_objects,
                        dict_2_game,
-                       use_graph=use_graph,atten=self.atten)
+                       use_graph=use_graph,atten=self.atten,emb_size=self.emb_size)
 
         print("...finished initializing gcn")
 
@@ -404,7 +418,7 @@ class DQN_agent:
                  model_type="mlp",
                  num_frames=None,
                  mode="skyline",
-                 hier=False,atten=False,one_layer=False):
+                 hier=False,atten=False,one_layer=False, emb_size=16):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)

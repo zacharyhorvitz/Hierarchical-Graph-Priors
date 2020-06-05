@@ -185,8 +185,16 @@ def parse_args():
                         help='just compute attention over neighbors',
                         action='store_true',
                         required=False)
-
-
+    parser.add_argument('--emb_size',
+                        help='size of node embeddings',
+                        type=int,
+                        default=16,
+                        required=False)
+    parser.add_argument('--multi_edge',
+                        help='specify single edge or multi edge',
+                        action='store_true',
+                        required=False)
+    
     return parser.parse_args()
 
 
