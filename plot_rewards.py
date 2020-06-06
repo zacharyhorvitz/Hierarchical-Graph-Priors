@@ -115,7 +115,7 @@ def parse_args():
 
     parser.add_argument('--no-plot', help='No plots', action='store_true')
     parser.add_argument('--no-show', help='Does not show plots', action='store_true')
-    parser.add_argument('--save-path', help='Save the plot here', type=str)
+    parser.add_argument('--savepath', help='Save the plot here', type=str)
     # yapf: enable
 
     return parser.parse_args()
@@ -132,8 +132,8 @@ if __name__ == "__main__":
 
     if not args.no_plot:
         assert args.x is not None and args.y is not None, "Must pass x, y if creating csv"
-        if args.save_path:
-            os.makedirs(os.path.split(args.save_path)[0], exist_ok=True)
+        if args.savepath:
+            os.makedirs(os.path.split(args.savepath)[0], exist_ok=True)
         if args.query is not None:
             print("Filtering with {query}".format(query=args.query))
             df = df.query(args.query)
@@ -143,5 +143,5 @@ if __name__ == "__main__":
              args.hue,
              args.style,
              args.seed,
-             savepath=args.save_path,
+             savepath=args.savepath,
              show=(not args.no_show))
