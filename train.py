@@ -80,7 +80,8 @@ agent_args = {
     "hier": args.use_hier,
     "atten": args.atten,
     "one_layer": args.one_layer,
-    "multi_edge": args.multi_edge
+    "multi_edge": args.multi_edge,
+    "use_glove": args.use_glove
 }
 agent = DQN_agent(**agent_args)
 

@@ -178,6 +178,11 @@ def parse_args():
                         help='specify single edge or multi edge',
                         action='store_true',
                         required=False)
+    parser.add_argument('--use_glove',
+                        help='specify whether nodes should be initialized to glove',
+                        action='store_true',
+                        required=False)
+    
     
     return parser.parse_args()
 

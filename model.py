@@ -65,6 +65,7 @@ class GCN(torch.nn.Module):
                  use_graph=True,
                  atten=False, 
                  one_layer=False,
+                 node_glove_embed=None,
                  emb_size=16):
         super(GCN, self).__init__()
 
@@ -86,36 +87,26 @@ class GCN(torch.nn.Module):
             v: k for k, v in self.node_to_game_char.items()
         }
         self.num_types=num_types
-        A_raw = adj_matrices  #torch.eye(self.n) #torch.load("") #./data/gcn/adjmat.dat")
-        self.A = [x.to(device) for x in A_raw] #normalize_adj(A_raw).tocsr().toarray().to(device)
+        A_raw = adj_matrices  
+        self.A = [x.to(device) for x in A_raw] 
         self.use_graph = use_graph
         self.num_edges = len(A_raw)
         if self.use_graph:
             if self.atten:
                 print('Using attention')
                 self.attention = torch.nn.ParameterList([torch.nn.Parameter(A.detach(), requires_grad=True) for A in A_raw])
-            #for i in range(self.num_edges):
-             #   self.add_module(str("atten_"+str(i)),self.attention[i])
 
-
-
-
-            #self.num_edges = len(A_raw)
             self.layer_sizes = [(4,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges)]
             self.num_layers = len(self.layer_sizes)
             self.weights = [[torch.nn.Linear(in_dim,out_dim,bias=False).to(device) for (in_dim,out_dim) in self.layer_sizes] for e in range(self.num_edges)]
             for i in range(self.num_edges):   
                 for j in range(self.num_layers):  
                      self.add_module(str((i,j)),self.weights[i][j])           
-        #weights = types x num_layers
-    #alternative, define matrix
-           # for e in self.edge_param:
-           #     e.W0 = torch.nn.Linear(self.emb_sz, 16, bias=False)
-        #e.combine0 = 
-            #    e.W1 = torch.nn.Linear(16, 16, bias=False)
-       #         e.W2 = torch.nn.Linear(16, 16, bias=False)
             self.get_node_emb = torch.nn.Embedding(self.n, 4)#self.emb_sz)
-            #self.final_mapping = torch.nn.Linear(self.emb_sz, self.emb_sz)
+            if node_glove_embed is not None:
+                 print("using glove!")
+                 self.get_node_emb.weight.data.copy_(node_glove_embed)
+                 self.get_node_emb.requires_grad = False
             self.state_mapping = torch.nn.Linear(self.emb_sz,4)
         self.obj_emb = torch.nn.Embedding(self.num_types, 4)
         print("finished initializing")
@@ -130,12 +121,8 @@ class GCN(torch.nn.Module):
                      weighting = F.normalize(self.attention[e] * self.A[e]) 
                  else:
                      weighting = F.normalize(self.A[e])
-          #       print(e)
-         #        print(self.A[e])
-           #      print(x)
                  layer_out.append(torch.mm(weighting, x))#)
             x = torch.cat([relu(self.weights[e][l](type_features))  for e,type_features in enumerate(layer_out)],axis=1)
-            #x = torch.cat([self.weights[e][l](type_features) for e,type_features in enumerate(layer_out)],axis=1)
         #x = self.final_mapping(x)
         return x
     def embed_state(self, game_state):
@@ -183,7 +170,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         atten=False, 
         one_layer=False, 
         emb_size=16,
-        multi_edge=False):
+        multi_edge=False,
+        use_glove=False):
         """Defining DQN CNN model
         """
         # initialize all parameters
@@ -199,6 +187,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         self.hier = hier
         self.emb_size = emb_size
         self.multi_edge = multi_edge
+        self.use_glove = use_glove
         print("building model")
         self.build_model()
 
@@ -282,28 +271,26 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         #    exit()
         elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected", "skyline_hier_multi", "skyline_hier_multi_atten"] and self.multi_edge:
 
-            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
+            latent_nodes = ["edge_tool","tool", "material","product"]
             skyline_edges = [("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
 
-            hier_edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
+            hier_edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("tool", "hoe_item"), ("tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
  
             edges = [skyline_edges,hier_edges]
             use_graph = True
 
-
-
         elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"]:
-            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
-            edges =[[ ("pickaxe_item","stone"),("axe_item","log"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("log","log_item"),("dirt","farmland"),("water","water_bucket_item"), ("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]]
+            latent_nodes = ["edge_tool","tool", "material","product"]
+            edges =[[ ("pickaxe_item","stone"),("axe_item","log"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("log","log_item"),("dirt","farmland"),("water","water_bucket_item"), ("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("tool", "hoe_item"), ("tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]]
             use_graph = True
 
         elif mode in ["skyline_simple", "skyline_simple_atten"]:
-            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
-            edges = [[("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]]
+            latent_nodes = ["edge_tool","tool", "material","product"]
+            edges = [[("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("tool", "hoe_item"), ("tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]]
             use_graph = True
         elif mode == "skyline_simple_trash" and hier:
-            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
-            edges = [[("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item"),("product","hoe_item")]]
+            latent_nodes = ["edge_tool","tool", "material","product"]
+            edges = [[("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("tool", "hoe_item"), ("tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item"),("product","hoe_item")]]
             use_graph = True
    
         elif mode == "ling_prior" and hier:
@@ -327,7 +314,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
-        dict_2_game = {
+        node_2_game = {
             i: object_to_char[name] for i, name in enumerate(game_nodes)
         }  #{0:2,1:3,2:4,3:5,4:6,5:7,6:8,7:9,8:10,9:11,10:12}
         num_nodes = len(game_nodes + latent_nodes)
@@ -348,14 +335,42 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         if mode == "fully_connected":
             adjacency = torch.FloatTensor(torch.ones(1,num_nodes, num_nodes))
 
+        if self.use_glove:
+             import json
+             with open("mine_embs.json","r",encoding="latin-1") as glove_file:
+                glove_dict = json.load(glove_file)
+
+                if mode in ["skyline","skyline_atten"]:
+                    glove_dict = glove_dict["skyline"]
+
+                elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"]:
+                    glove_dict = glove_dict["skyline_hier"]
+                
+                elif mode in ["skyline_simple", "skyline_simple_atten"]:
+                    glove_dict = glove_dict["skyline_simple"]
+                else:
+                    print("Invalid config use of use_glove")
+                    exit()
+
+             node_glove_embed = []
+             for node in sorted(game_nodes+latent_nodes,key=lambda x: name_2_node[x]):
+                  embed = np.array([glove_dict[x] for x in node.replace(" ","_").replace("-","_").split("_")])
+                  embed = torch.FloatTensor(np.mean(embed,axis=0))
+                  node_glove_embed.append(embed)
+            
+             node_glove_embed = torch.stack(node_glove_embed)
+        else:
+             node_glove_embed = None
+
         self.gcn = GCN(adjacency,
                        self.device,
                        num_nodes,
                        total_objects,
-                       dict_2_game,
+                       node_2_game,
                        use_graph=use_graph,
                        atten=self.atten,
-                       emb_size=self.emb_size)
+                       emb_size=self.emb_size,
+                       node_glove_embed=node_glove_embed)
 
         print("...finished initializing gcn")
 
@@ -439,7 +454,8 @@ class DQN_agent:
                  atten=False,
                  one_layer=False, 
                  emb_size=16,
-                 multi_edge=False):
+                 multi_edge=False,
+                 use_glove=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
@@ -455,7 +471,8 @@ class DQN_agent:
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
-                                              multi_edge=multi_edge)
+                                              multi_edge=multi_edge,
+                                              use_glove=use_glove)
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
                                               action_space,
@@ -464,7 +481,8 @@ class DQN_agent:
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
-                                              multi_edge=multi_edge)
+                                              multi_edge=multi_edge,
+                                              use_glove=use_glove)
 
 
             #stone's adjacencies [1,0,1]
