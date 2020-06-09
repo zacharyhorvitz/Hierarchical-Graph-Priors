@@ -55,11 +55,12 @@ if args.mode in ['skyline_simple'] or '_hier' in args.mode:
 if '_atten' in args.mode:
     args.atten = True
 
+if '_multi' in args.mode:
+    args.multi_edge = True
+
 if args.mode == 'cnn':
     args.num_frames = 1
 
-if '_multi' in args.mode:
-    args.multi_edge = True
 # Initialize model
 agent_args = {
     "device": device,
@@ -75,7 +76,7 @@ agent_args = {
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
     "num_frames": args.num_frames,
-    "mode": args.mode,  #skyline,ling_prior,embed_bl,cnn
+    "mode": args.mode,
     "hier": args.use_hier,
     "atten": args.atten,
     "one_layer": args.one_layer,

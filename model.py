@@ -199,7 +199,6 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         self.hier = hier
         self.emb_size = emb_size
         self.multi_edge = multi_edge
-
         print("building model")
         self.build_model()
 
@@ -281,13 +280,15 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             use_graph = True
         #else:
         #    exit()
-        elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"] and self.multi_edge:
+        elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected", "skyline_hier_multi", "skyline_hier_multi_atten"] and self.multi_edge:
 
+            latent_nodes = ["edge_tool","non_edge_tool", "material","product"]
             skyline_edges = [("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
 
             hier_edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("non_edge_tool", "hoe_item"), ("non_edge_tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
  
             edges = [skyline_edges,hier_edges]
+            use_graph = True
 
 
 
@@ -323,9 +324,6 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             use_graph = False
             latent_nodes = []
             edges = []
-        else:
-            print("Invalid configuration")
-            sys.exit()
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
@@ -355,7 +353,9 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
                        num_nodes,
                        total_objects,
                        dict_2_game,
-                       use_graph=use_graph,atten=self.atten,emb_size=self.emb_size)
+                       use_graph=use_graph,
+                       atten=self.atten,
+                       emb_size=self.emb_size)
 
         print("...finished initializing gcn")
 
@@ -371,7 +371,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         graph_modes = [
                 "skyline", "skyline_hier", "skyline_atten",
                 "skyline_hier_atten", "skyline_simple", "skyline_simple_atten",
-                "skyline_simple_trash", "ling_prior", "fully_connected"
+                "skyline_simple_trash", "ling_prior", "fully_connected",
+                "skyline_hier_multi", "skyline_hier_multi_atten"
         ]
 
         if self.mode in graph_modes:
@@ -452,14 +453,19 @@ class DQN_agent:
                                               num_actions,
                                               num_frames=num_frames,
                                               mode=mode,
-                                              hier=hier,atten=atten)
+                                              hier=hier,
+                                              atten=atten,
+                                              multi_edge=multi_edge)
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
                                               action_space,
                                               num_actions,
                                               num_frames=num_frames,
                                               mode=mode,
-                                              hier=hier,atten=atten)
+                                              hier=hier,
+                                              atten=atten,
+                                              multi_edge=multi_edge)
+
 
             #stone's adjacencies [1,0,1]
             #pickaxe's adjacencies [1,1,0]
