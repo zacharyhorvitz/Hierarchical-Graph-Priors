@@ -17,7 +17,6 @@ from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
 from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 
 args = parse_args()
-
 # Setting cuda seeds
 if torch.cuda.is_available():
     torch.backends.cuda.deterministic = True
@@ -59,6 +58,8 @@ if '_atten' in args.mode:
 if args.mode == 'cnn':
     args.num_frames = 1
 
+if '_multi' in args.mode:
+    args.multi_edge = True
 # Initialize model
 agent_args = {
     "device": device,
@@ -77,7 +78,8 @@ agent_args = {
     "mode": args.mode,  #skyline,ling_prior,embed_bl,cnn
     "hier": args.use_hier,
     "atten": args.atten,
-    "one_layer": args.one_layer
+    "one_layer": args.one_layer,
+    "multi_edge": args.multi_edge
 }
 agent = DQN_agent(**agent_args)
 
