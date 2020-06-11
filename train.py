@@ -14,6 +14,7 @@ from model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
+from envs.advanced_malmo_numpy_env import MalmoEnvSpecial as AdvEnvNpy
 from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 
 args = parse_args()
@@ -33,6 +34,9 @@ run_tag = args.run_tag
 if args.env == 'npy':
     env = EnvNpy(random=True, mission=None)
     test_env = EnvNpy(random=True, mission=None)
+elif args.env == 'adv_npy':
+    env = AdvEnvNpy(random=True, mission=None)
+    test_env = AdvEnvNpy(random=True, mission=None)
 elif args.env == 'malmo_server':
     assert args.address is not None
     assert args.port is not None
@@ -79,6 +83,7 @@ agent_args = {
     "mode": args.mode,
     "hier": args.use_hier,
     "atten": args.atten,
+    "emb_size": args.emb_size,
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
     "use_glove": args.use_glove

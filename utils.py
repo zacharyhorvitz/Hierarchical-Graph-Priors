@@ -14,7 +14,7 @@ def parse_args():
     parser.add_argument('--env',
                         help='The malmo environment to train on',
                         type=str,
-                        choices=['npy', 'malmo_server'],
+                        choices=['npy','adv_npy','malmo_server'],
                         default='npy',
                         required=True)
     parser.add_argument('--run-tag',
