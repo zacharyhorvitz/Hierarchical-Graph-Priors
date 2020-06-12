@@ -82,7 +82,7 @@ def parse_args():
     parser.add_argument('--max-steps',
                         help='Number of steps to run for',
                         type=int,
-                        default=1000000,
+                        default=2000000,
                         required=False)
     parser.add_argument('--checkpoint-steps',
                         help='Checkpoint every so often',
@@ -97,12 +97,12 @@ def parse_args():
     parser.add_argument('--num-test-runs',
                         help='Number of times to test',
                         type=int,
-                        default=100,
+                        default=50,
                         required=False)
     parser.add_argument('--warmup-period',
                         help='Number of steps to act randomly and not train',
                         type=int,
-                        default=100000,
+                        default=250000,
                         required=False)
     parser.add_argument('--batchsize',
                         help='Number of experiences sampled from replay buffer',
@@ -123,12 +123,12 @@ def parse_args():
     parser.add_argument('--epsilon-decay',
                         help='Parameter for epsilon decay',
                         type=int,
-                        default=100000,
+                        default=1000000,
                         required=False)
     parser.add_argument('--epsilon-decay-end',
                         help='Parameter for epsilon decay end',
                         type=int,
-                        default=0.1,
+                        default=0.05,
                         required=False)
     parser.add_argument('--replay-buffer-size',
                         help='Max size of replay buffer',

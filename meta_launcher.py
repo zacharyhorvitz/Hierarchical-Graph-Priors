@@ -67,7 +67,11 @@ if args.meta_tag_id is not None:
 if args.meta_tag_name is not None:
     cmd_prefix_list = [' '.join([prefix, '--'+args.meta_tag_name, suffix]) for (prefix, suffix) in zip(cmd_prefix_list, cmd_suffix_list)]
 
-wrap_cmd = "python ccv_script.py --jobname {} --gpus 1 --mem 7 --duration medium --env ~/envs/reai --command \"{}\""
+# Naveen use this one for --account condo (just uncomment it and comment the other)
+# wrap_cmd = "python ccv_script.py --jobname {} --gpus 1 --mem 7 --duration medium --env ~/data/reai_group5/new_venv --account carney-cs-condo --command \"{}\""
+
+# Everyone else use this one
+wrap_cmd = "python ccv_script.py --jobname {} --account carney-cs-condo --gpus 1 --cpus 2 --mem 7 --duration medium --env ~/data/reai_group5/new_venv --command \"{}\""
 
 for cmd in cmd_prefix_list:
     print(wrap_cmd.format(cmd.split(' ')[-1], cmd))
