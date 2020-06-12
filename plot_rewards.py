@@ -52,7 +52,6 @@ def plot(data, x, y, hue, style, seed, savepath=None, show=True):
     col_wrap = 2 if len(data['env'].unique()) > 1 else 1
 
     palette = sns.color_palette('Set1', n_colors=len(data[hue].unique()), desat=0.5)
-
     if isinstance(seed, list) or seed == 'average':
         g = sns.relplot(x=x,
                         y=y,
