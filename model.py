@@ -237,10 +237,10 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
                           ("axe_item", "log"), ("log", "log_item"),
                           ("hoe_item", "dirt"), ("dirt", "farmland"),
                           ("bucket_item", "water"), ("water", "water_bucket_item")]
-            verb_edges = [("pickaxe_item", "attack_1"), ("attack_1", "stone"),
-                          ("axe_item", "attack_1"), ("attack_1", "log"),
-                          ("hoe_item", "use_1"), ("use_1", "dirt"), 
-                          ("bucket_item", "use_1"), ("use_1", "water")]
+            verb_edges = [("mine_1", "pickaxe_item"), ("mine_1", "stone"),
+                          ("chop_1", "axe_item"), ("chop_1", "log"),
+                          ("farm_1", "hoe_item"), ("farm_1", "dirt"), 
+                          ("fill_1", "bucket_item"), ("fill_1", "water")]
             # yapf: enable 
             edges = noun_edges + verb_edges
             latent_nodes = ['attack_1', 'use_1']
