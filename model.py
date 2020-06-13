@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import random
 from collections import deque, namedtuple
+import sys
 
 from utils import sync_networks, conv2d_size_out
 
@@ -243,7 +244,7 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
                           ("fill_1", "bucket_item"), ("fill_1", "water")]
             # yapf: enable 
             edges = noun_edges + verb_edges
-            latent_nodes = ['attack_1', 'use_1']
+            latent_nodes = ['mine_1', 'chop_1', 'farm_1', 'fill_1']
             use_graph = True
         elif mode in ["cnn", "embed_bl"]:
             use_graph = False

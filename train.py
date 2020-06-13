@@ -13,6 +13,9 @@ from model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
+from envs.advanced_malmo_numpy_env import MalmoEnvSpecial as AdvEnv
+from envs.malmo_separated_env import MalmoEnvSpecial as SepEnv
+from envs.advanced_malmo_separated_env import MalmoEnvSpecial as AdvSep
 from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 from envs.gym_wrappers import FakeActions
 
@@ -34,6 +37,15 @@ run_tag = args.run_tag
 if args.env == 'npy':
     env = EnvNpy(random=True, mission=None)
     test_env = EnvNpy(random=True, mission=None)
+elif args.env == 'adv_npy':
+    env = AdvEnv(random=True, mission=None)
+    test_env = AdvEnv(random=True, mission=None)
+elif args.env == 'sep':
+    env = SepEnv(random=True, mission=None)
+    test_env = SepEnv(random=True, mission=None)
+elif args.env == 'adv_sep':
+    env = AdvSep(random=True, mission=None)
+    test_env = AdvSep(random=True, mission=None)
 elif 'npy_fakeactions_' in args.env:
     num_new_actions = int(args.env.replace('npy_fakeactions_', ''))
     env = FakeActions(EnvNpy(random=True, mission=None), num_new_actions)

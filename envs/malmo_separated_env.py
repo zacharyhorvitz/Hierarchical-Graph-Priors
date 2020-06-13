@@ -109,8 +109,10 @@ class MalmoEnvSpecial(gym.Env):
         self.player_x = 6
         self.player_y = 4
         self.arena = self.init_map(self.current_mission)
-        self.attacking = False
-        self.using = False
+        self.mining = False
+        self.chopping = False
+        self.filling = False
+        self.farming = False
         self.steps = 0
         self.inventory = np.zeros((10))
         self.selected_inv_item = 0  #Cannot change!
