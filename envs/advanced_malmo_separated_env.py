@@ -24,7 +24,7 @@ class MalmoEnvSpecial(gym.Env):
             "shift"
         ]
         self.action_space = Discrete(len(self.actions))
-        self.observation_space = gym.spaces.Box(0, 32, shape=(1, 9, 11))
+        self.observation_space = gym.spaces.Box(0, 32, shape=(9, 10))
 
         self.mission_types = ["pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"]
         self.step_cost = -0.1

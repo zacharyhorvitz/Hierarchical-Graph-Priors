@@ -138,18 +138,17 @@ class DQN_MALMO_DUELING_model(DQN_Base_model):
         num_actions,
         num_frames=4,
         final_dense_layer=50,
-        input_shape=(9, 9),
         mode="skyline",  #skyline,ling_prior,embed_bl,cnn
         hier=False):
         # initialize all parameters
-        print("using MALMO DUELING {} {} {}".format(num_frames, final_dense_layer, input_shape))
+        print("using MALMO DUELING {} {} {}".format(num_frames, final_dense_layer, state_space.shape))
         super(DQN_MALMO_DUELING_model, self).__init__(device,
                                                       state_space,
                                                       action_space,
                                                       num_actions)
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
-        self.input_shape = input_shape
+        self.input_shape = state_space.shape
         self.embedding_size = 4
         self.embedded_state_size = self.embedding_size * self.input_shape[0] * self.input_shape[1]
         self.mode = mode
