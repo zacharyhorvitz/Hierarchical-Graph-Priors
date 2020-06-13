@@ -145,6 +145,7 @@ while global_steps < args.max_steps:
     print(f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start)}")
     start = time.time()
     state = env.reset()
+    import pdb; pdb.set_trace()
     done = False
     agent.set_epsilon(global_steps, writer)
 

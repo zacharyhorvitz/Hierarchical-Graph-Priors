@@ -11,7 +11,7 @@ class MalmoEnvSpecial(gym.Env):
         if random == False:
             assert mission is not None
             self.current_mission = mission
-
+        self.observation_space = gym.spaces.Box(0, 32, shape=(1, 9, 10))
         self.actions = [
             "movenorth", "movesouth", "movewest", "moveeast",
             "chop 0", "chop 1", # axe 
