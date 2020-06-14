@@ -63,7 +63,7 @@ class GCN(torch.nn.Module):
                  idx_2_game_char,
                  embed_wall=False,
                  use_graph=True,
-                 atten=False, 
+                 atten=False,
                  one_layer=False,
                  node_glove_embed=None,
                  emb_size=16):
@@ -87,8 +87,8 @@ class GCN(torch.nn.Module):
             v: k for k, v in self.node_to_game_char.items()
         }
         self.num_types=num_types
-        A_raw = adj_matrices  
-        self.A = [x.to(device) for x in A_raw] 
+        A_raw = adj_matrices
+        self.A = [x.to(device) for x in A_raw]
         self.use_graph = use_graph
         self.num_edges = len(A_raw)
         if self.use_graph:
@@ -99,29 +99,29 @@ class GCN(torch.nn.Module):
             self.layer_sizes = [(self.emb_sz,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges)]
             self.num_layers = len(self.layer_sizes)
             self.weights = [[torch.nn.Linear(in_dim,out_dim,bias=False).to(device) for (in_dim,out_dim) in self.layer_sizes] for e in range(self.num_edges)]
-            for i in range(self.num_edges):   
-                for j in range(self.num_layers):  
-                     self.add_module(str((i,j)),self.weights[i][j])           
+            for i in range(self.num_edges):
+                for j in range(self.num_layers):
+                    self.add_module(str((i,j)),self.weights[i][j])
             self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
             if node_glove_embed is not None:
-                 print("using glove!")
-                 self.get_node_emb.weight.data.copy_(node_glove_embed)
-                 self.get_node_emb.requires_grad = True #False
+                print("using glove!")
+                self.get_node_emb.weight.data.copy_(node_glove_embed)
+                self.get_node_emb.requires_grad = True #False
             self.final_mapping = torch.nn.Linear(self.emb_sz,self.emb_sz)
         self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
         print("finished initializing")
     def gcn_embed(self):
         node_embeddings = self.get_node_emb(self.nodes)
-    #make size 16, first layer
+        #make size 16, first layer
         x = node_embeddings
         for l in range(self.num_layers):
             layer_out = []
             for e in range(self.num_edges):
-                 if self.atten:
-                     weighting = F.normalize(self.attention[e] * self.A[e]) 
-                 else:
-                     weighting = F.normalize(self.A[e])
-                 layer_out.append(torch.mm(weighting, x))#)
+                if self.atten:
+                    weighting = F.normalize(self.attention[e] * self.A[e])
+                else:
+                    weighting = F.normalize(self.A[e])
+                layer_out.append(torch.mm(weighting, x))#)
             x = torch.cat([relu(self.weights[e][l](type_features))  for e,type_features in enumerate(layer_out)],axis=1)
         x = self.final_mapping(x)
         return x
@@ -142,7 +142,7 @@ class GCN(torch.nn.Module):
             # print("USING GRAPHS!!!!!")
             node_embeddings = self.gcn_embed()
             #print('node embeddings size:', node_embeddings.shape)
-        #    node_embeddings_shrunk = self.state_mapping(relu(node_embeddings))
+            #    node_embeddings_shrunk = self.state_mapping(relu(node_embeddings))
             #print('node_emb_shrunk_sz:', node_embeddings_shrunk.shape)
             for n, embedding in zip(self.nodes.tolist(), node_embeddings):
                 if n in self.node_to_game_char:
@@ -152,6 +152,135 @@ class GCN(torch.nn.Module):
 
         return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
 
+class DQN_KG_CONV(DQN_Base_model):
+    def __init__(self, device, state_space, action_space, num_actions, num_frames, kg_conv):
+        super(DQN_KG_CONV, self).__init__(device, state_space, action_space, num_actions)
+        
+        self.num_frames = num_frames
+        self.use_kg_conv = kg_conv
+        self.input_shape = state_space
+
+        self.latent_nodes = ["edge_tool","tool", "material","product"]
+        skyline_edges = [("pickaxe_item", "stone"), ("axe_item", "log"),
+                         ("log", "log_item"), ("hoe_item", "dirt"),
+                         ("bucket_item", "water"),
+                         ("stone", "cobblestone_item"), ("dirt", "farmland"),
+                         ("water", "water_bucket_item")]
+
+        hier_edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"),
+                      ("tool", "hoe_item"), ("tool", "bucket_item"),
+                      ("material", "stone"), ("material", "log"),
+                      ("material", "dirt"), ("material", "water"),
+                      ("product", "log_item"), ("product", "cobblestone_item"),
+                      ("product", "farmland"), ("product", "water_bucket_item")]
+
+        self.edges = [skyline_edges,hier_edges]
+
+        object_to_char = {
+            "air": 0,
+            "wall": 1,
+            "stone": 2,
+            "pickaxe_item": 3,
+            "cobblestone_item": 4,
+            "log": 5,
+            "axe_item": 6,
+            "dirt": 7,
+            "farmland": 8,
+            "hoe_item": 9,
+            "water": 10,
+            "bucket_item": 11,
+            "water_bucket_item": 12,
+            "log_item": 13,
+            "dirt_item": 14,
+            "farmland_item": 15
+        }
+        non_node_objects = ["air", "wall"]
+        game_nodes = sorted(
+            [k for k in object_to_char.keys() if k not in non_node_objects])
+
+        use_graph = True
+        total_objects = len(game_nodes + latent_nodes + non_node_objects)
+        name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
+        node_2_game = {
+            i: object_to_char[name] for i, name in enumerate(game_nodes)
+        }
+        num_nodes = len(game_nodes + latent_nodes)
+
+        adjacency = torch.FloatTensor(torch.zeros(len(edges),num_nodes, num_nodes))
+        for edge_type in range(len(edges)):
+            for i in range(num_nodes):
+                adjacency[edge_type][i][i] = 1.0
+            for s, d in edges[edge_type]:
+                adjacency[edge_type][name_2_node[d]][
+                name_2_node[s]] = 1.0  #corrected transpose!!!!
+
+        self.gcn = GCN(adjacency,
+                       self.device,
+                       num_nodes,
+                       total_objects,
+                       node_2_game,
+                       use_graph=use_graph,
+                       atten=self.atten,
+                       emb_size=self.emb_size,
+                       node_glove_embed=None)
+        
+        # BODY 
+
+        self.conv1 = torch.nn.Conv2d(self.num_frames, 64, kernel_size=(3,3), stride=1)
+        self.conv2 = torch.nn.Conv2d(64, 64, kernel_size=(3,3), stride=1)
+        self.conv3 = torch.nn.Conv2d(64, 32, kernel_size=(3,3), stride=1)
+        
+        if self.use_kg_conv:
+            self.kg_conv1 = torch.nn.Conv2d(self.num_frames, 64, kernel_size=(1,1), stride=1)
+            self.kg_conv2 = torch.nn.Conv2d(self.num_frames, 64, kernel_size=(1,1), stride=1)
+            self.kg_conv2 = torch.nn.Conv2d(self.num_frames, 32, kernel_size=(1,1), stride=1)
+
+        final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
+        final_size = conv2d_size_out(final_size, (3, 3), 1)
+        final_size = conv2d_size_out(final_size, (3, 3), 1)
+
+        self.head = torch.nn.Sequential(*[
+            torch.nn.Linear(final_size[0] * final_size[1] * 32 +
+                            self.emb_size, self.final_dense_layer),
+            torch.nn.ReLU(),
+            torch.nn.Linear(self.final_dense_layer, self.num_actions)
+        ])
+    
+    def forward(self, state):
+        goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
+        state = state[:, :, :, 1:]
+
+        state, node_embeds = self.gcn.embed_state(state.long())
+        goal_embeddings = node_embeds[[
+            self.gcn.game_char_to_node[g.item()] for g in goals
+        ]]
+
+        cnn_output = self.conv1(state)
+        if self.use_kg_conv:
+            cnn_output += self.kg_conv1(state)
+
+        cnn_output = self.conv2(cnn_output)
+        if self.use_kg_conv:
+            cnn_output += self.kg_conv2(state)
+
+        cnn_output = self.conv3(cnn_output)
+        if self.use_kg_conv:
+            cnn_output += self.kg_conv3(state)
+
+        cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+
+        q_value = self.head(cnn_output)
+
+    def act(self, state, epsilon):
+        if random.random() < epsilon:
+            return self.action_space.sample()
+        else:
+            with torch.no_grad():
+                state_tensor = torch.Tensor(state).unsqueeze(0)
+                action_tensor = self.argmax_over_actions(state_tensor)
+                action = action_tensor.cpu().detach().numpy().flatten()[0]
+                assert self.action_space.contains(action)
+            return action
 
 class DQN_MALMO_CNN_model(DQN_Base_model):
     """Docstring for DQN CNN model """
@@ -167,8 +296,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         #input_shape=(9, 9),
         mode="skyline",  #skyline,ling_prior,embed_bl,cnn
         hier=False,
-        atten=False, 
-        one_layer=False, 
+        atten=False,
+        one_layer=False,
         emb_size=16,
         multi_edge=False,
         use_glove=False):
@@ -204,23 +333,23 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             # torch.nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1),
             # torch.nn.ReLU()
         ])
-        #print(self.input_shape) 
+        #print(self.input_shape)
         #exit()
-        final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
         #print(final_size)
-        final_size = conv2d_size_out(final_size, (3, 3), 1)
 
         #print(final_size)
         # final_size = conv2d_size_out(final_size, (3, 3), 1)
         # final_size = conv2d_size_out(final_size, (3, 3), 1)
         #print(self.emb_size)
+        final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
+        final_size = conv2d_size_out(final_size, (3, 3), 1)
         self.head = torch.nn.Sequential(*[
             torch.nn.Linear(final_size[0] * final_size[1] * 32 +
                             self.emb_size, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
- 
+
 
         self.build_gcn(self.mode, self.hier)
 
@@ -258,7 +387,6 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             "dirt_item": 14,
             "farmland_item": 15
         }
-        #object_to_char = {"air":0,"bedrock":1,"stone":2,"pickaxe_item":3,"cobblestone_item":4,"log":5,"axe_item":6,"dirt":7,"farmland":8,"hoe_item":9,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
         non_node_objects = ["air", "wall"]
         game_nodes = sorted(
             [k for k in object_to_char.keys() if k not in non_node_objects])
@@ -280,7 +408,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             skyline_edges = [("pickaxe_item","stone"),("axe_item","log"),("log","log_item"),("hoe_item","dirt"),("bucket_item","water"),("stone","cobblestone_item"),("dirt","farmland"),("water","water_bucket_item")]
 
             hier_edges = [("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("tool", "hoe_item"), ("tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item")]
- 
+
             edges = [skyline_edges,hier_edges]
             use_graph = True
 
@@ -297,7 +425,7 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             latent_nodes = ["edge_tool","tool", "material","product"]
             edges = [[("edge_tool", "pickaxe_item"), ("edge_tool", "axe_item"), ("tool", "hoe_item"), ("tool", "bucket_item"), ("material", "stone"), ("material", "log"), ("material", "dirt"), ("material", "water"),("product","log_item"),("product","cobblestone_item"),("product","farmland"),("product","water_bucket_item"),("product","hoe_item")]]
             use_graph = True
-   
+
         elif mode == "ling_prior" and hier:
             use_graph = True
             latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
@@ -329,8 +457,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         print("Latent Nodes:", latent_nodes)
         print("Edges:", edges)
 
-        adjacency = torch.FloatTensor(torch.zeros(len(edges),num_nodes, num_nodes))
         #if "simple" in mode: adjacency = torch.FloatTensor(torch.ones(num_nodes, num_nodes))
+        adjacency = torch.FloatTensor(torch.zeros(len(edges),num_nodes, num_nodes))
         for edge_type in range(len(edges)):
             for i in range(num_nodes):
                 adjacency[edge_type][i][i] = 1.0
@@ -341,8 +469,8 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             adjacency = torch.FloatTensor(torch.ones(1,num_nodes, num_nodes))
 
         if self.use_glove:
-             import json
-             with open("mine_embs.json","r",encoding="latin-1") as glove_file:
+            import json
+            with open("mine_embs.json","r",encoding="latin-1") as glove_file:
                 glove_dict = json.load(glove_file)
 
                 if mode in ["skyline","skyline_atten"]:
@@ -350,22 +478,22 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
 
                 elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"]:
                     glove_dict = glove_dict["skyline_hier"]
-                
+
                 elif mode in ["skyline_simple", "skyline_simple_atten"]:
                     glove_dict = glove_dict["skyline_simple"]
                 else:
                     print("Invalid config use of use_glove")
                     exit()
 
-             node_glove_embed = []
-             for node in sorted(game_nodes+latent_nodes,key=lambda x: name_2_node[x]):
-                  embed = np.array([glove_dict[x] for x in node.replace(" ","_").replace("-","_").split("_")])
-                  embed = torch.FloatTensor(np.mean(embed,axis=0))
-                  node_glove_embed.append(embed)
-            
-             node_glove_embed = torch.stack(node_glove_embed)
+            node_glove_embed = []
+            for node in sorted(game_nodes+latent_nodes,key=lambda x: name_2_node[x]):
+                embed = np.array([glove_dict[x] for x in node.replace(" ","_").replace("-","_").split("_")])
+                embed = torch.FloatTensor(np.mean(embed,axis=0))
+                node_glove_embed.append(embed)
+
+            node_glove_embed = torch.stack(node_glove_embed)
         else:
-             node_glove_embed = None
+            node_glove_embed = None
 
         self.gcn = GCN(adjacency,
                        self.device,
@@ -458,7 +586,7 @@ class DQN_agent:
                  mode="skyline",
                  hier=False,
                  atten=False,
-                 one_layer=False, 
+                 one_layer=False,
                  emb_size=16,
                  multi_edge=False,
                  use_glove=False):
