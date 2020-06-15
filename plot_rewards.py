@@ -33,9 +33,9 @@ def parse_filepath(fp, filename, bin_size, window_size):
         return None
 
 
-def collate_results(results_dir, filename, bin_size, window_size):
+def collate_results(results_dirs, filename, bin_size, window_size):
     dfs = []
-    for run in glob.glob(os.path.join(os.path.normpath(results_dir), '*')):
+    for run in results_dirs:
         print("Found {run}".format(run=run))
         run_df = parse_filepath(run, filename, bin_size, window_size)
         if run_df is None:
@@ -99,7 +99,7 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # yapf: disable
-    parser.add_argument('--results-dir', help='Directory for results', required=True, type=str)
+    parser.add_argument('--results-dirs', help='Directories for results', required=True, nargs='+', type=str)
     parser.add_argument('--filename', help='CSV filename', required=False, type=str)
     parser.add_argument('--bin-size', help='How much to reduce the data by', type=int, default=10)
     parser.add_argument('--window-size', help='How much to average the data by', type=int, default=10)
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     print("Smoothing by {window_size}, binning by {bin_size}".format(window_size=args.window_size,
                                                                      bin_size=args.bin_size))
     assert args.filename is not None, "Must pass filename if creating csv"
-    df = collate_results(args.results_dir, args.filename, args.bin_size, args.window_size)
+    df = collate_results(args.results_dirs, args.filename, args.bin_size, args.window_size)
 
     if not args.no_plot:
         assert args.x is not None and args.y is not None, "Must pass x, y if creating csv"
