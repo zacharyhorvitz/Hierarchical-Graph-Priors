@@ -33,7 +33,7 @@ def parse_args():
                         help="Type of architecture",
                         type=str,
                         default='cnn',
-                        choices=["cnn"],
+                        choices=["cnn", "separated_arch"],
                         required=False)
     parser.add_argument('--model-path',
                         help='The path to the save the pytorch model',

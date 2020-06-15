@@ -155,7 +155,7 @@ class GCN(torch.nn.Module):
 class DQN_KG_CONV(DQN_Base_model):
     def __init__(self, device, state_space, action_space, num_actions, num_frames, kg_conv):
         super(DQN_KG_CONV, self).__init__(device, state_space, action_space, num_actions)
-        
+
         self.num_frames = num_frames
         self.use_kg_conv = kg_conv
         self.input_shape = state_space
@@ -223,13 +223,13 @@ class DQN_KG_CONV(DQN_Base_model):
                        atten=self.atten,
                        emb_size=self.emb_size,
                        node_glove_embed=None)
-        
-        # BODY 
+
+        # BODY
 
         self.conv1 = torch.nn.Conv2d(self.num_frames, 64, kernel_size=(3,3), stride=1)
         self.conv2 = torch.nn.Conv2d(64, 64, kernel_size=(3,3), stride=1)
         self.conv3 = torch.nn.Conv2d(64, 32, kernel_size=(3,3), stride=1)
-        
+
         if self.use_kg_conv:
             self.kg_conv1 = torch.nn.Conv2d(self.num_frames, 64, kernel_size=(1,1), stride=1)
             self.kg_conv2 = torch.nn.Conv2d(self.num_frames, 64, kernel_size=(1,1), stride=1)
@@ -245,7 +245,7 @@ class DQN_KG_CONV(DQN_Base_model):
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
-    
+
     def forward(self, state):
         goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
         state = state[:, :, :, 1:]
@@ -268,6 +268,7 @@ class DQN_KG_CONV(DQN_Base_model):
             cnn_output += self.kg_conv3(state)
 
         cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+        cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
 
         q_value = self.head(cnn_output)
 
@@ -583,6 +584,7 @@ class DQN_agent:
                  double_DQN,
                  model_type="mlp",
                  num_frames=None,
+                 kg_conv=False,
                  mode="skyline",
                  hier=False,
                  atten=False,
@@ -619,6 +621,21 @@ class DQN_agent:
                                               multi_edge=multi_edge,
                                               use_glove=use_glove,
                                               emb_size=emb_size)
+        if model_type == "separated_arch":
+            assert num_frames
+            self.num_frames = num_frames
+            self.online = DQN_KG_CONV(device,
+                                      state_space,
+                                      action_space,
+                                      num_actions,
+                                      num_frames=num_frames,
+                                      kg_conv=kg_conv)
+            self.target = DQN_KG_CONV(device,
+                                      state_space,
+                                      action_space,
+                                      num_actions,
+                                      num_frames=num_frames,
+                                      kg_conv=kg_conv)
 
 
             #stone's adjacencies [1,0,1]

@@ -56,6 +56,11 @@ else:
 if args.mode in ['skyline_simple'] or '_hier' in args.mode:
     args.use_hier = True
 
+if '_kg_conv' in args.mode:
+    args.kg_conv = True
+else:
+    args.kg_conv = False
+
 if '_atten' in args.mode:
     args.atten = True
 
@@ -79,6 +84,7 @@ agent_args = {
     "warmup_period": args.warmup_period,
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
+    "kg_conv": args.kg_conv,
     "num_frames": args.emb_size if args.mode != 'cnn' else 1, #num_frames,
   #  "num_frames": args.num_frames,
     "mode": args.mode,
