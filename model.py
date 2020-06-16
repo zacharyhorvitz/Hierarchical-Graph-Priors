@@ -12,148 +12,7 @@ Experience = namedtuple('Experience',
                         ['state', 'action', 'reward', 'next_state', 'done'])
 
 
-class DQN_Base_model(torch.nn.Module):
-    """Docstring for DQN MLP model """
-
-    def __init__(self, device, state_space, action_space, num_actions):
-        """Defining DQN MLP model
-        """
-        # initialize all parameters
-        super(DQN_Base_model, self).__init__()
-        self.state_space = state_space
-        self.action_space = action_space
-        self.device = device
-        self.num_actions = num_actions
-
-    def build_model(self):
-        # output should be in batchsize x num_actions
-        raise NotImplementedError
-
-    def forward(self, state):
-        raise NotImplementedError
-
-    def max_over_actions(self, state):
-        state = state.to(self.device)
-        return torch.max(self(state), dim=1)
-
-    def argmax_over_actions(self, state):
-        state = state.to(self.device)
-        return torch.argmax(self(state), dim=1)
-
-    def act(self, state, epsilon):
-        if random.random() < epsilon:
-            return self.action_space.sample()
-        else:
-            with torch.no_grad():
-                state_tensor = torch.Tensor(state).unsqueeze(0)
-                action_tensor = self.argmax_over_actions(state_tensor)
-                action = action_tensor.cpu().detach().numpy().flatten()[0]
-                assert self.action_space.contains(action)
-            return action
-
-
-# Adapted from https://github.com/tkipf/pygcn.
-class GCN(torch.nn.Module):
-
-    def __init__(self,
-                 adj_matrices,
-                 device,
-                 num_nodes,
-                 num_types,
-                 idx_2_game_char,
-                 embed_wall=False,
-                 use_graph=True,
-                 atten=False, 
-                 one_layer=False,
-                 node_glove_embed=None,
-                 emb_size=16):
-        super(GCN, self).__init__()
-
-        print("starting init")
-        # n = 5
-        self.n = num_nodes  #n
-        self.num_types = num_types
-        self.emb_sz = emb_size
-        if embed_wall:
-            self.wall_embed = torch.FloatTensor(torch.ones(
-                self.emb_sz)).to(device)
-        else:
-            self.wall_embed = None
-        self.atten = atten
-        self.nodes = torch.arange(0, self.n)
-        self.nodes = self.nodes.to(device)
-        self.node_to_game_char = idx_2_game_char  #{i:i+1 for i in self.objects.tolist()}
-        self.game_char_to_node = {
-            v: k for k, v in self.node_to_game_char.items()
-        }
-        self.num_types=num_types
-        A_raw = adj_matrices  
-        self.A = [x.to(device) for x in A_raw] 
-        self.use_graph = use_graph
-        self.num_edges = len(A_raw)
-        if self.use_graph:
-            if self.atten:
-                print('Using attention')
-                self.attention = torch.nn.ParameterList([torch.nn.Parameter(A.detach(), requires_grad=True) for A in A_raw])
-
-            self.layer_sizes = [(self.emb_sz,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges),(self.emb_sz,self.emb_sz//self.num_edges)]
-            self.num_layers = len(self.layer_sizes)
-            self.weights = [[torch.nn.Linear(in_dim,out_dim,bias=False).to(device) for (in_dim,out_dim) in self.layer_sizes] for e in range(self.num_edges)]
-            for i in range(self.num_edges):   
-                for j in range(self.num_layers):  
-                     self.add_module(str((i,j)),self.weights[i][j])           
-            self.get_node_emb = torch.nn.Embedding(self.n, self.emb_sz)
-            if node_glove_embed is not None:
-                 print("using glove!")
-                 self.get_node_emb.weight.data.copy_(node_glove_embed)
-                 self.get_node_emb.requires_grad = True #False
-            self.final_mapping = torch.nn.Linear(self.emb_sz,self.emb_sz)
-        self.obj_emb = torch.nn.Embedding(self.num_types, self.emb_sz)
-        print("finished initializing")
-    def gcn_embed(self):
-        node_embeddings = self.get_node_emb(self.nodes)
-    #make size 16, first layer
-        x = node_embeddings
-        for l in range(self.num_layers):
-            layer_out = []
-            for e in range(self.num_edges):
-                 if self.atten:
-                     weighting = F.normalize(self.attention[e] * self.A[e]) 
-                 else:
-                     weighting = F.normalize(self.A[e])
-                 layer_out.append(torch.mm(weighting, x))#)
-            x = torch.cat([relu(self.weights[e][l](type_features))  for e,type_features in enumerate(layer_out)],axis=1)
-        x = self.final_mapping(x)
-        return x
-    def embed_state(self, game_state):
-        game_state_embed = self.obj_emb(
-            game_state.view(-1, game_state.shape[-2] * game_state.shape[-1]))
-        game_state_embed = game_state_embed.view(-1, game_state.shape[-2],
-                                                 game_state.shape[-1],
-                                                 self.emb_sz)
-
-        if self.wall_embed:
-            indx = (game_state == 1).nonzero()
-            game_state_embed[indx[:, 0], indx[:, 1], indx[:,
-                                                          2]] = self.wall_embed
-
-        node_embeddings = None
-        if self.use_graph:
-            # print("USING GRAPHS!!!!!")
-            node_embeddings = self.gcn_embed()
-            #print('node embeddings size:', node_embeddings.shape)
-        #    node_embeddings_shrunk = self.state_mapping(relu(node_embeddings))
-            #print('node_emb_shrunk_sz:', node_embeddings_shrunk.shape)
-            for n, embedding in zip(self.nodes.tolist(), node_embeddings):
-                if n in self.node_to_game_char:
-                    indx = (game_state == self.node_to_game_char[n]).nonzero()
-                    game_state_embed[indx[:, 0], indx[:, 1],
-                                     indx[:, 2]] = embedding
-
-        return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
-
-
-class DQN_MALMO_CNN_model(DQN_Base_model):
+class DQN_MALMO_CNN_model():
     """Docstring for DQN CNN model """
 
     def __init__(
@@ -177,8 +36,10 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
         # initialize all parameters
         print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer,
                                                 state_space))
-        super(DQN_MALMO_CNN_model, self).__init__(device, state_space,
-                                                  action_space, num_actions)
+        self.state_space = state_space
+        self.action_space = action_space
+        self.device = device
+        self.num_actions = num_actions
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
         self.input_shape = state_space
@@ -425,6 +286,14 @@ class DQN_MALMO_CNN_model(DQN_Base_model):
             print("Invalid mode")
             sys.exit()
         return q_value
+
+    def max_over_actions(self, state):
+        state = state.to(self.device)
+        return torch.max(self(state), dim=1)
+
+    def argmax_over_actions(self, state):
+        state = state.to(self.device)
+        return torch.argmax(self(state), dim=1)
 
     def act(self, state, epsilon):
         if random.random() < epsilon:
