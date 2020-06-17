@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from utils import parse_args, append_timestamp
+from utils import parse_args, append_timestamp, create_heatmap
 from model import DQN_agent, Experience
 #from model_new import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
@@ -101,6 +101,15 @@ if args.load_checkpoint_path:
     agent.target.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     agent.online.train()
+
+
+####################################################################
+############### Create Embedding Similarity Heatmap ################
+####################################################################
+embeddings = agent.online.gcn.gcn_embed().detach().cpu().numpy()
+create_heatmap(embeddings, args.run_tag)
+####################################################################
+
 
 # Save path
 if args.model_path:

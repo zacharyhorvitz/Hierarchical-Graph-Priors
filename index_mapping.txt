@@ -1,0 +1,1 @@
+{0: 'axe_item', 1: 'bucket_item', 2: 'cobblestone_item', 3: 'dirt', 4: 'dirt_item', 5: 'farmland', 6: 'farmland_item', 7: 'hoe_item', 8: 'log', 9: 'log_item', 10: 'pickaxe_item', 11: 'stone', 12: 'water', 13: 'water_bucket_item', 14: 'edge_tool', 15: 'non_edge_tool', 16: 'material', 17: 'product'}

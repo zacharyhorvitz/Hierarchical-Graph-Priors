@@ -4,7 +4,31 @@ import numpy as np
 import torch
 import argparse
 from datetime import datetime
+import seaborn as sns
+from scipy.spatial.distance import pdist, squareform
+import pandas as pd
 
+def create_heatmap(v, title):
+    with open('index_mapping.txt', 'r') as f:
+        idx_map = eval(f.read())
+    headers = [idx_map[i] for i in range(18)]
+    transformed_data = PCA(n_components=1).fit_transform(v)
+    df = pd.DataFrame({h : [transformed_data[i]] for i, h in enumerate(headers)}).T
+    pairwise_top = pd.DataFrame(
+        squareform(pdist(df)),
+        columns = df.index,
+        index = df.index
+    )
+    sns.set(font_scale=0.7)
+    plt.figure(figsize=(10,10))
+    plot = sns.heatmap(
+        pairwise_top,
+        cmap='OrRd',
+        linewidth=1
+    )
+    plot.set_title("Pairwise similarity for {0}".format(title))
+    plot.figure.savefig(title+".png")
+    plt.show()
 
 def parse_args():
     # Parse input arguments
