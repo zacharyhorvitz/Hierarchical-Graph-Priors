@@ -181,18 +181,16 @@ class NodeAtten(torch.nn.Module):
 		return self.final_layer(self_attention(K,V,Q))
 
 
-
 class CNN_NODE_ATTEN_BLOCK(torch.nn.Module):
-    def __init__(self,in_channels,out_channels,kernel,node_embed_size):
+    def __init__(self,in_channels,out_channels,kernel,node_embed_size,node_2_game_char):
         super(CNN_NODE_ATTEN_BLOCK, self).__init__()
-        #a cnn
-        #self attention block
-        
+	self.node_2_game_char = node_2_game_char
+	self.conv_layer = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(kernel, kernel), stride=1, padding='SAME'),
+	self.node_atten = NodeAtten(node_embed_size,node_embed_size,out_channels)
 
-    def forward(self, game_board,state,node_embed):
-       #do a convolution of state
-       #feed node_embeddings into self attention
-       #call embed_state
-       #return new state        
+    def forward(self, game_board,state,node_embeds,goal_embed):
+       conv_out = self.conv_layer(state) #do a convolution of state
+       out_node_embeds = self.node_atten(node_embeds, goal_embed)
+       return embed_state(game_board,conv_out,out_node_embeds,self.node_2_game_char)
 
 
