@@ -55,37 +55,35 @@ class DQN_MALMO_CNN_model():
     def build_model(self):
         # output should be in batchsize x num_actions
         # First layer takes in states
-        self.body_1 = torch.nn.Sequential(*[
-            torch.nn.Conv2d(self.num_frames, 32, kernel_size=(3, 3), stride=1, padding='SAME'),
-            torch.nn.ReLU(),
-            torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1,padding='SAME'),
-            torch.nn.ReLU()# ,
-            #torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
-            #torch.nn.ReLU(),
-            #torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
-            #torch.nn.ReLU()
-        ])
+#         self.body_1 = torch.nn.Sequential(*[
+#             torch.nn.Conv2d(self.num_frames, 32, kernel_size=(3, 3), stride=1, padding='SAME'),
+#             torch.nn.ReLU(),
+#             torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1,padding='SAME'),
+#             torch.nn.ReLU()# ,
+#             #torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
+#             #torch.nn.ReLU(),
+#             #torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
+#             #torch.nn.ReLU()
+#         ])
 
-        
-        #print(self.input_shape) 
-        #exit()
-        #final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
-        #print(final_size)
-        #final_size = conv2d_size_out(final_size, (3, 3), 1)
+#  self.head = torch.nn.Sequential(*[
+#             torch.nn.Linear(final_size[0] * final_size[1] * 32 +
+#                             self.emb_size, self.final_dense_layer),
+#             torch.nn.ReLU(),
+#             torch.nn.Linear(self.final_dense_layer, self.num_actions)
+#         ])
 
-        #print(final_size)
-        # final_size = conv2d_size_out(final_size, (3, 3), 1)
-        # final_size = conv2d_size_out(final_size, (3, 3), 1)
-        #print(self.emb_size)
+        node_2_game_char = build_gcn(self.mode, self.hier)
+
+        self.block_1 = CNN_NODE_ATTEN_BLOCK(self.num_frames,32,3,self.emb_size,node_2_game_char)
+        self.block_2 = CNN_NODE_ATTEN_BLOCK(32,32,3,self.emb_size,node_2_game_char)
+
         self.head = torch.nn.Sequential(*[
-            torch.nn.Linear(final_size[0] * final_size[1] * 32 +
+            torch.nn.Linear(input_shape[0] * input_shape[1] * 32 +
                             self.emb_size, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
- 
-
-        self.build_gcn(self.mode, self.hier)
 
         trainable_parameters = sum(
             p.numel() for p in self.parameters() if p.requires_grad)
@@ -239,6 +237,8 @@ class DQN_MALMO_CNN_model():
                        atten=self.atten,
                        emb_size=self.emb_size,
                        node_glove_embed=node_glove_embed)
+        
+        return self.gcn.node_2_game_char
 
         print("...finished initializing gcn")
 
@@ -259,9 +259,12 @@ class DQN_MALMO_CNN_model():
         }
 
         if self.mode in graph_modes:
-            state, node_embeds = self.gcn.embed_state(state.long())
+#             state, node_embeds = self.gcn.embed_state(state.long())
+            node_embeds = self.gcn.gcn_embed()
+            
+            
             #   print(state.shape)
-            cnn_output = self.body(state)
+#             cnn_output = self.body(state)
             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
             goal_embeddings = node_embeds[[
                 self.gcn.game_char_to_node[g.item()] for g in goals
@@ -269,21 +272,21 @@ class DQN_MALMO_CNN_model():
             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
             q_value = self.head(cnn_output)
 
-        elif self.mode == "embed_bl":
-            state, _ = self.gcn.embed_state(state.long())
-            cnn_output = self.body(state)
-            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-            goal_embeddings = self.gcn.obj_emb(goals)
-            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
-            q_value = self.head(cnn_output)
+#         elif self.mode == "embed_bl":
+#             state, _ = self.gcn.embed_state(state.long())
+#             cnn_output = self.body(state)
+#             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+#             goal_embeddings = self.gcn.obj_emb(goals)
+#             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+#             q_value = self.head(cnn_output)
 
-        elif self.mode == "cnn":
-            #print(self.num_frames)
-            cnn_output = self.body(state)
-            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
-            goal_embeddings = self.gcn.obj_emb(goals)
-            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
-            q_value = self.head(cnn_output)
+#         elif self.mode == "cnn":
+#             #print(self.num_frames)
+#             cnn_output = self.body(state)
+#             cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+#             goal_embeddings = self.gcn.obj_emb(goals)
+#             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+#             q_value = self.head(cnn_output)
         else:
             print("Invalid mode")
             sys.exit()
