@@ -85,41 +85,6 @@ class GCN(torch.nn.Module):
         x = self.final_mapping(x)
         return x
 
-#     def embed_state(self, game_state):
-
-
-         
-#          # game_state = bz,9,9
-#          # game_state_embed = bz,9,9,4
-
-
-
-#         game_state_embed = self.obj_emb(
-#             game_state.view(-1, game_state.shape[-2] * game_state.shape[-1]))
-#         game_state_embed = game_state_embed.view(-1, game_state.shape[-2],
-#                                                  game_state.shape[-1],
-#                                                  self.emb_sz)
-
-#         if self.wall_embed:
-#             indx = (game_state == 1).nonzero()
-#             game_state_embed[indx[:, 0], indx[:, 1], indx[:,
-#                                                           2]] = self.wall_embed
-
-#         node_embeddings = None
-#         if self.use_graph:
-#             # print("USING GRAPHS!!!!!")
-#             node_embeddings = self.gcn_embed()
-#             #print('node embeddings size:', node_embeddings.shape)
-#         #    node_embeddings_shrunk = self.state_mapping(relu(node_embeddings))
-#             #print('node_emb_shrunk_sz:', node_embeddings_shrunk.shape)
-#             for n, embedding in zip(self.nodes.tolist(), node_embeddings):
-#                 if n in self.node_to_game_char:
-#                     indx = (game_state == self.node_to_game_char[n]).nonzero()
-#                     game_state_embed[indx[:, 0], indx[:, 1],
-#                                      indx[:, 2]] = embedding
-
-#         return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
-
 def embed_state(game_board,state,node_embeddings,node_2_game_char):
         node_embeddings = Noneq
             # node_embeddings = self.gcn_embed()
