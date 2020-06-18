@@ -120,13 +120,12 @@ class GCN(torch.nn.Module):
 
 #         return game_state_embed.permute((0, 3, 1, 2)), node_embeddings
 
-    def embed_state(self, game_board,state,node_embeddings):
-        node_embeddings = None
-        if self.use_graph:
+def embed_state(game_board,state,node_embeddings,node_2_game_char):
+        node_embeddings = Noneq
             # node_embeddings = self.gcn_embed()
-            for n, embedding in zip(self.nodes.tolist(), node_embeddings):
+        for n, embedding in enumerate(node_embeddings):
                 if n in self.node_to_game_char:
-                    indx = (game_board == self.node_to_game_char[n]).nonzero()
+                    indx = (game_board == node_to_game_char[n]).nonzero()
                     state[indx[:, 0], indx[:, 1],
                                      indx[:, 2]] = embedding
 
@@ -145,29 +144,6 @@ def self_attention(K, V , Q):
 	window_size_queries = Q.shape[1] # window size of queries
 	window_size_keys = K.shape[1] # window size of keys
 	key_size = K.shape[-1] # window size of keys
-	#TODO:
-	#-1) compute attention weights using queries and key matrices (if use_mask==True, then make sure to add the attention mask before softmax)
-	#-2) build new embeddings by applying the attention weights to the values matrices
-
-
-	# Check lecture slides for how to compute self-attention
-	# Remember: 
-	# - Q is [batch_size x window_size_queries x embedding_size]
-	# - V is [batch_size x window_size_values x embedding_size]
-	# - K is [batch_size x window_size_keys x embedding_size]
-	# - Mask is [batch_size x window_size_queries x window_size_keys]
-
-
-	# Here, queries are matmuled with the transpose of keys to produce for every query vector, weights per key vector. 
-	# This can be thought of as: for every query word, how much should I pay attention to the other words in this window?
-	# Those weights are then used to create linear combinations of the corresponding values for each query.
-	# Those queries will become the new embeddings.
-
-	# kdu3 note: 
-	# - Q shape is something like (100, 14, 64)
-	# - K shape is something like (100, 14, 64)
-	# - transpose_b of K is the same as tf.transpose(K, [0, 2, 1]), which gives you a shape of something like (100, 64, 14)
-	# - your result is seomthing like (100, 14, 14) - you leave 100 by itself and do a matrix multiplication across (14, 64) x (64, 14)
 	
 	query_key_scores_raw = torch.matmul(Q, torch.transpose(K,2,1))
 	query_key_scores_raw = query_key_scores_raw/torch.sqrt(key_size) # THIS LINE IS NOT NEEDED, just running it to test perplexity/see if it does better
@@ -204,5 +180,19 @@ class NodeAtten(torch.nn.Module):
 
 		return self.final_layer(self_attention(K,V,Q))
 
+
+
+class CNN_NODE_ATTEN_BLOCK(torch.nn.Module):
+    def __init__(self,in_channels,out_channels,kernel,node_embed_size):
+        super(CNN_NODE_ATTEN_BLOCK, self).__init__()
+        #a cnn
+        #self attention block
+        
+
+    def forward(self, game_board,state,node_embed):
+       #do a convolution of state
+       #feed node_embeddings into self attention
+       #call embed_state
+       #return new state        
 
 
