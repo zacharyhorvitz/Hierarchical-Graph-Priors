@@ -5,6 +5,7 @@ import random
 from collections import deque, namedtuple
 import torch.nn.functional as F
 from torch.nn.functional import relu
+from modules import *
 
 from utils import sync_networks, conv2d_size_out
 
@@ -53,25 +54,6 @@ class DQN_MALMO_CNN_model():
         self.build_model()
 
     def build_model(self):
-        # output should be in batchsize x num_actions
-        # First layer takes in states
-#         self.body_1 = torch.nn.Sequential(*[
-#             torch.nn.Conv2d(self.num_frames, 32, kernel_size=(3, 3), stride=1, padding='SAME'),
-#             torch.nn.ReLU(),
-#             torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1,padding='SAME'),
-#             torch.nn.ReLU()# ,
-#             #torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
-#             #torch.nn.ReLU(),
-#             #torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
-#             #torch.nn.ReLU()
-#         ])
-
-#  self.head = torch.nn.Sequential(*[
-#             torch.nn.Linear(final_size[0] * final_size[1] * 32 +
-#                             self.emb_size, self.final_dense_layer),
-#             torch.nn.ReLU(),
-#             torch.nn.Linear(self.final_dense_layer, self.num_actions)
-#         ])
 
         node_2_game_char = build_gcn(self.mode, self.hier)
 
@@ -79,8 +61,8 @@ class DQN_MALMO_CNN_model():
         self.block_2 = CNN_NODE_ATTEN_BLOCK(32,32,3,self.emb_size,node_2_game_char)
 
         self.head = torch.nn.Sequential(*[
-            torch.nn.Linear(input_shape[0] * input_shape[1] * 32 +
-                            self.emb_size, self.final_dense_layer),
+            torch.nn.Linear(input_shape[0] * input_shape[1] * 32 #+self.emb_size
+                            , self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
@@ -259,17 +241,17 @@ class DQN_MALMO_CNN_model():
         }
 
         if self.mode in graph_modes:
-#             state, node_embeds = self.gcn.embed_state(state.long())
-            node_embeds = self.gcn.gcn_embed()
-            
-            
-            #   print(state.shape)
-#             cnn_output = self.body(state)
-            cnn_output = cnn_output.reshape(cnn_output.size(0), -1)
+            node_embeds = self.gcn.gcn_embed() 
             goal_embeddings = node_embeds[[
                 self.gcn.game_char_to_node[g.item()] for g in goals
             ]]
-            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+  
+            out = self.block_1(state,state,node_embeds,goal_embeddings)
+            out = F.relu(out)
+            out = self.block_2(state,out,node_embeds,goal_embeddings)
+            out = F.relu(out)
+          
+            cnn_output = cnn_output.reshape(out.size(0), -1)
             q_value = self.head(cnn_output)
 
 #         elif self.mode == "embed_bl":
