@@ -86,15 +86,37 @@ class GCN(torch.nn.Module):
         return x
 
 def embed_state(game_board,state,node_embeddings,node_2_game_char):
-        node_embeddings = Noneq
+        #node_embeddings = None
             # node_embeddings = self.gcn_embed()
-        for n, embedding in enumerate(node_embeddings):
-                if n in self.node_to_game_char:
-                    indx = (game_board == node_to_game_char[n]).nonzero()
-                    state[indx[:, 0], indx[:, 1],
-                                     indx[:, 2]] = embedding
+        state = state.permute((0, 2, 3, 1))
+        game_board = torch.unsqueeze(game_board,1)
+        emb_sz = node_embeddings.shape[-1]
+        num_nodes = node_embeddings.shape[1]
+        b_sz = node_embeddings.shape[0]
+        grid_rows = game_board.shape[1]
+        grid_columns = game_board.shape[2]
+                
+       # print("BOARD",game_board.shape)
+        #for b in range(len(node_embeddings)):
+        node_mask = torch.zeros((num_nodes,b_sz,grid_rows,grid_columns)).cuda()
+        for n in range(num_nodes):
+                if n in node_2_game_char:
+                    indx = (game_board == node_2_game_char[n]).nonzero()
+                    node_mask[n][indx[:, 0],indx[:, 1],indx[:,2]] += 1 #node_embeddings[indx[:,0]][n]  #embedding
+        
+        node_mask = torch.unsqueeze(torch.transpose(node_mask,1,0),-1).repeat(1,1,1,1,emb_sz)
+        #print("MASK",node_mask.shape)
+        #print(node_embeddings.shape)
+        node_embeddings = node_embeddings.view(b_sz,num_nodes,1,1,-1).repeat(1,1,grid_rows,grid_columns,1)*node_mask
+        #print(node_embeddings.shape)
+        node_embeddings = torch.sum(node_embeddings,1)
 
-        return state.permute((0, 3, 1, 2)), node_embeddings
+        #print(node_embeddings.shape)
+        #print(state.shape)
+
+
+        state += node_embeddings
+        return state.permute((0, 3, 1, 2)) #, node_embeddings
 
 def self_attention(K, V , Q):
 	"""
@@ -111,15 +133,15 @@ def self_attention(K, V , Q):
 	key_size = K.shape[-1] # window size of keys
 	
 	query_key_scores_raw = torch.matmul(Q, torch.transpose(K,2,1))
-	query_key_scores_raw = query_key_scores_raw/torch.sqrt(key_size) # THIS LINE IS NOT NEEDED, just running it to test perplexity/see if it does better
-	weights = torch.functional.softmax(query_key_scores_aw)
+	query_key_scores_raw = query_key_scores_raw/np.sqrt(key_size) # THIS LINE IS NOT NEEDED, just running it to test perplexity/see if it does better
+	weights = F.softmax(query_key_scores_raw)
 	build_new_embeds = torch.matmul(weights, V)
 
 	return build_new_embeds
 
 class NodeAtten(torch.nn.Module):
-    def __init__(self,node_emb_size,key_size,final_size):
-        super(Model, self).__init__()
+    def __init__(self,node_emb_size,key_size):
+        super(NodeAtten, self).__init__()
         self.wQ = torch.nn.Parameter(torch.zeros(2*node_emb_size,key_size))
         self.wK = torch.nn.Parameter(torch.zeros(2*node_emb_size,key_size))
         self.wV = torch.nn.Parameter(torch.zeros(2*node_emb_size,key_size))
@@ -128,34 +150,41 @@ class NodeAtten(torch.nn.Module):
         torch.nn.init.xavier_uniform(self.wK)
         torch.nn.init.xavier_uniform(self.wV)
 
-        self.concat_goal = concat_goal
-
-        self.final_layer = torch.nn.Linear(key_size,final_size)
-
     def forward(self, node_embs, goal_embs):
     	#node embs = b sz x num_nodes x emb sz
     	# goal embs = b sz x emb sz
 
-		goal_embeddings = goal_embs.view(node_embs.goal_embs[-1],1,-1).repeat(1,node_embs.shape[1],1)
-		node_embs = torch.cat((node_embs,goal_embs))
-
-		Q = torch.mm(node_embs,wQ)
-		K= torch.mm(node_embs,wK)
-		V = torch.mm(node_embs,wV)
-
-		return self.final_layer(self_attention(K,V,Q))
+        node_embs = torch.cat((node_embs,goal_embeddings), axis=-1)
+        Q = torch.tensordot(node_embs,self.wQ, dims=([2],[0]))
+        K = torch.tensordot(node_embs,self.wK, dims=([2],[0]))
+        V = torch.tensordot(node_embs,self.wV, dims=([2],[0]))
+        return self_attention(K,V,Q)
 
 
 class CNN_NODE_ATTEN_BLOCK(torch.nn.Module):
-    def __init__(self,in_channels,out_channels,kernel,node_embed_size,node_2_game_char):
+    def __init__(self,in_channels,out_channels,kernel,node_embed_size,node_2_game_char,use_self_atten,proj_embs):
         super(CNN_NODE_ATTEN_BLOCK, self).__init__()
-	self.node_2_game_char = node_2_game_char
-	self.conv_layer = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(kernel, kernel), stride=1, padding='SAME'),
-	self.node_atten = NodeAtten(node_embed_size,node_embed_size,out_channels)
+        self.node_2_game_char = node_2_game_char
+        self.conv_layer = torch.nn.Conv2d(in_channels, out_channels, kernel_size=(kernel, kernel), stride=1, padding=(kernel//2,kernel//2))
+        self.use_self_atten = use_self_atten
+        self.proj_embs = proj_embs
+
+        if self.use_self_atten and self.proj_embs:
+           self.node_atten = NodeAtten(node_embed_size,node_embed_size)
+           self.final_layer = torch.nn.Linear(node_embed_size,out_channels) 
+        elif self.proj_embs: 
+           self.final_layer = torch.nn.Linear(2*node_embed_size,out_channels) 
 
     def forward(self, game_board,state,node_embeds,goal_embed):
        conv_out = self.conv_layer(state) #do a convolution of state
-       out_node_embeds = self.node_atten(node_embeds, goal_embed)
-       return embed_state(game_board,conv_out,out_node_embeds,self.node_2_game_char)
-
+       if self.proj_embs:
+          node_embeds = node_embeds.view(1,node_embeds.shape[0],node_embeds.shape[1]).repeat(goal_embed.shape[0],1,1)
+          goal_embeddings = goal_embed.view(goal_embed.shape[0],1,-1).repeat(1,node_embeds.shape[1],1)
+          if self.use_self_atten:
+             out_node_embeds = self.node_atten(node_embeds, goal_embeddings)
+          else:
+             out_node_embeds = torch.cat((node_embeds,goal_embeddings), axis=-1)
+          out_node_embeds = self.final_layer(out_node_embeds)
+          conv_out = embed_state(game_board,conv_out,out_node_embeds,self.node_2_game_char)
+       return conv_out
 

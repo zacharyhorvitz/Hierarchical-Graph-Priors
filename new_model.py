@@ -13,7 +13,7 @@ Experience = namedtuple('Experience',
                         ['state', 'action', 'reward', 'next_state', 'done'])
 
 
-class DQN_MALMO_CNN_model():
+class DQN_MALMO_CNN_model(torch.nn.Module):
     """Docstring for DQN CNN model """
 
     def __init__(
@@ -31,10 +31,12 @@ class DQN_MALMO_CNN_model():
         one_layer=False, 
         emb_size=16,
         multi_edge=False,
-        use_glove=False):
+        use_glove=False,
+        self_attention=False):
         """Defining DQN CNN model
         """
         # initialize all parameters
+        super(DQN_MALMO_CNN_model, self).__init__()
         print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer,
                                                 state_space))
         self.state_space = state_space
@@ -50,18 +52,19 @@ class DQN_MALMO_CNN_model():
         self.emb_size = emb_size
         self.multi_edge = multi_edge
         self.use_glove = use_glove
+        self.self_attention = self_attention
         print("building model")
         self.build_model()
 
     def build_model(self):
 
-        node_2_game_char = build_gcn(self.mode, self.hier)
+        node_2_game_char = self.build_gcn(self.mode, self.hier)
 
-        self.block_1 = CNN_NODE_ATTEN_BLOCK(self.num_frames,32,3,self.emb_size,node_2_game_char)
-        self.block_2 = CNN_NODE_ATTEN_BLOCK(32,32,3,self.emb_size,node_2_game_char)
+        self.block_1 = CNN_NODE_ATTEN_BLOCK(1,32,3,self.emb_size,node_2_game_char,self.self_attention,self.mode!='cnn')
+        self.block_2 = CNN_NODE_ATTEN_BLOCK(32,32,3,self.emb_size,node_2_game_char,self.self_attention,self.mode!='cnn')
 
         self.head = torch.nn.Sequential(*[
-            torch.nn.Linear(input_shape[0] * input_shape[1] * 32 #+self.emb_size
+            torch.nn.Linear(self.input_shape[0] * self.input_shape[1] * 32 + self.emb_size
                             , self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
@@ -220,7 +223,7 @@ class DQN_MALMO_CNN_model():
                        emb_size=self.emb_size,
                        node_glove_embed=node_glove_embed)
         
-        return self.gcn.node_2_game_char
+        return self.gcn.node_to_game_char
 
         print("...finished initializing gcn")
 
@@ -241,18 +244,27 @@ class DQN_MALMO_CNN_model():
         }
 
         if self.mode in graph_modes:
-            node_embeds = self.gcn.gcn_embed() 
-            goal_embeddings = node_embeds[[
+            
+          node_embeds = self.gcn.gcn_embed()  
+          goal_embeddings = node_embeds[[
                 self.gcn.game_char_to_node[g.item()] for g in goals
-            ]]
+            ]] 
+        elif self.mode == "cnn":
+             node_embeds = None
+             goal_embeddings = self.gcn.obj_emb(goals)
+              
+        else:
+            print("Invalid mode")
+            sys.exit()
   
-            out = self.block_1(state,state,node_embeds,goal_embeddings)
-            out = F.relu(out)
-            out = self.block_2(state,out,node_embeds,goal_embeddings)
-            out = F.relu(out)
+        out = self.block_1(state,state,node_embeds,goal_embeddings)
+        out = F.relu(out)
+        out = self.block_2(state,out,node_embeds,goal_embeddings)
+        out = F.relu(out)
           
-            cnn_output = cnn_output.reshape(out.size(0), -1)
-            q_value = self.head(cnn_output)
+        cnn_output = out.reshape(out.size(0), -1)
+        cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+        q_value = self.head(cnn_output)
 
 #         elif self.mode == "embed_bl":
 #             state, _ = self.gcn.embed_state(state.long())
@@ -269,9 +281,6 @@ class DQN_MALMO_CNN_model():
 #             goal_embeddings = self.gcn.obj_emb(goals)
 #             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
 #             q_value = self.head(cnn_output)
-        else:
-            print("Invalid mode")
-            sys.exit()
         return q_value
 
     def max_over_actions(self, state):
@@ -317,7 +326,8 @@ class DQN_agent:
                  one_layer=False, 
                  emb_size=16,
                  multi_edge=False,
-                 use_glove=False):
+                 use_glove=False,
+                 self_attention=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)

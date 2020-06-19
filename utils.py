@@ -183,6 +183,10 @@ def parse_args():
                         action='store_true',
                         required=False)
     
+    parser.add_argument('--self_attention',
+                        help='specify whether self attention applied to node embeddings',
+                        action='store_true',
+                        required=False)
     
     return parser.parse_args()
 

@@ -9,7 +9,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import parse_args, append_timestamp
-from model import DQN_agent, Experience
+from new_model import DQN_agent, Experience
 #from model_new import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
@@ -87,7 +87,8 @@ agent_args = {
     "emb_size": args.emb_size,
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
-    "use_glove": args.use_glove
+    "use_glove": args.use_glove,
+    "self_attention": args.self_attention
 }
 agent = DQN_agent(**agent_args)
 
