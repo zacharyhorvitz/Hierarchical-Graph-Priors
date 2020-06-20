@@ -142,3 +142,4 @@ MalmoPlatform/
 logs/
 plots/ 
 slurm/
+.onager

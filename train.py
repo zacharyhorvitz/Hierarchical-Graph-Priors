@@ -9,8 +9,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import parse_args, append_timestamp
-from new_model import DQN_agent, Experience
-#from model_new import DQN_agent, Experience
+from model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
