@@ -46,7 +46,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         self.num_actions = num_actions
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
-        if isinstance(state_space) == Space:
+        if isinstance(state_space, Space):
             self.input_shape = state_space.shape
         else:
             self.input_shape = state_space
@@ -73,11 +73,11 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
                                             node_2_game_char,
                                             self.self_attention,
-                                            self.mode != 'cnn')
+                                            self.mode not in ['cnn', 'dueling'])
         self.block_2 = CNN_NODE_ATTEN_BLOCK(32, 32, 3, self.emb_size,
                                             node_2_game_char,
                                             self.self_attention,
-                                            self.mode != 'cnn')
+                                            self.mode not in ['cnn', 'dueling'])
 
         final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
         final_size = conv2d_size_out(final_size, (3, 3), 1)
@@ -396,7 +396,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.num_actions = num_actions
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
-        if isinstance(state_space) == Space:
+        if isinstance(state_space, Space):
             self.input_shape = state_space.shape
         else:
             self.input_shape = state_space

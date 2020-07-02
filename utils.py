@@ -14,7 +14,6 @@ def parse_args():
     parser.add_argument('--env',
                         help='The malmo environment to train on',
                         type=str,
-                        choices=['npy','adv_npy','malmo_server'],
                         default='npy',
                         required=True)
     parser.add_argument('--run-tag',
@@ -33,7 +32,7 @@ def parse_args():
                         help="Type of architecture",
                         type=str,
                         default='cnn',
-                        choices=["cnn"],
+                        choices=["cnn", "dueling"],
                         required=False)
     parser.add_argument('--model-path',
                         help='The path to the save the pytorch model',

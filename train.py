@@ -7,6 +7,7 @@ import gym
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
+import minerl
 
 from utils import parse_args, append_timestamp
 from model import DQN_agent, Experience
@@ -42,6 +43,9 @@ elif args.env == 'malmo_server':
     env = EnvMalmo(random=True, mission=None)
     test_env = EnvMalmo(random=True, mission=None)
     #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address)
+else:
+    env = gym.make(args.env)
+    test_env = gym.make(args.env)
 
 env.seed(args.seed)
 test_env.seed(args.seed)
@@ -64,12 +68,21 @@ if '_multi' in args.mode:
 if args.mode == 'cnn':
     args.num_frames = 1
 
+num_actions = 0
+if isinstance(env.action_space, gym.spaces.Dict):
+    for action_name, action in env.action_space.spaces.items(): 
+        if isinstance(action, gym.spaces.Discrete):
+            num_actions += action.n
+        print("{} has {} actions".format(action_name, action.n))
+else:
+    num_actions = env.action_space.n
+
 # Initialize model
 agent_args = {
     "device": device,
     "state_space": env.observation_space,
     "action_space": env.action_space,
-    "num_actions": env.action_space.n,
+    "num_actions": num_actions,
     "target_moving_average": args.target_moving_average,
     "gamma": args.gamma,
     "replay_buffer_size": args.replay_buffer_size,
@@ -78,8 +91,7 @@ agent_args = {
     "warmup_period": args.warmup_period,
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
-    "num_frames": args.emb_size if args.mode != 'cnn' else 1, #num_frames,
-  #  "num_frames": args.num_frames,
+    "num_frames": args.emb_size if args.mode != 'cnn' else 1,
     "mode": args.mode,
     "hier": args.use_hier,
     "atten": args.atten,
@@ -87,7 +99,7 @@ agent_args = {
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
     "use_glove": args.use_glove,
-    "self_attention": args.self_attention
+    "self_attention": args.self_attention,
 }
 agent = DQN_agent(**agent_args)
 
