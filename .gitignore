@@ -143,3 +143,4 @@ logs/
 plots/ 
 slurm/
 .onager
+scripts/
