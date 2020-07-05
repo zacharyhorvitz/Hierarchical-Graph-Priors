@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 #import minerl
 
 from utils import parse_args, append_timestamp
-from model import DQN_agent, Experience
+from model_old import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
@@ -104,14 +104,14 @@ agent_args = {
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
     "num_frames": args.emb_size if args.mode != 'cnn' else 1,
+    "atten": args.atten,
     "mode": args.mode,
     "hier": args.use_hier,
-    "atten": args.atten,
     "emb_size": args.emb_size,
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
-    "use_glove": args.use_glove,
-    "self_attention": args.self_attention,
+    "use_glove": args.use_glove#,
+#    "self_attention": args.self_attention,
 }
 agent = DQN_agent(**agent_args)
 

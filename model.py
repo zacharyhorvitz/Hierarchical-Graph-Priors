@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, NodeAtten, embed_state, self_attention
+from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK, NodeAtten, embed_state, self_attention
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience',
@@ -414,15 +414,21 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         node_2_game_char = self.build_gcn(self.mode, self.hier)
 
-        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
-                                            node_2_game_char,
-                                            self.self_attention,
-                                            self.mode != 'cnn')
-        self.block_2 = CNN_NODE_ATTEN_BLOCK(32, 32, 3, self.emb_size,
-                                            node_2_game_char,
-                                            self.self_attention,
-                                            self.mode != 'cnn')
+#        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
+         #                                   node_2_game_char,
+         #                                   self.self_attention,
+         #                                   self.mode != 'cnn')
+ #       self.block_2 = CNN_NODE_ATTEN_BLOCK(32, 32, 3, self.emb_size,
+         #                                   node_2_game_char,
+         #                                   self.self_attention,
+         #                                   self.mode != 'cnn')
 
+        self.block_1 = CNN_2D_NODE_BLOCK(1, 32, 3, self.emb_size,
+                                            node_2_game_char,
+                                            self.mode != 'cnn')
+        self.block_2 = CNN_2D_NODE_BLOCK(32, 32, 3, self.emb_size,
+                                            node_2_game_char,
+                                            self.mode != 'cnn')
         self.head = torch.nn.Sequential(*[
             torch.nn.Linear(
                 self.input_shape[0] * self.input_shape[1] * 32 +

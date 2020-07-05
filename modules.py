@@ -134,6 +134,24 @@ def embed_state(game_board, state, node_embeddings, node_2_game_char):
     state += node_embeddings
     return state.permute((0, 3, 1, 2))  #, node_embeddings
 
+def embed_state2D(game_board, state, node_embeddings, node_2_game_char):
+    #node_embeddings = None
+    # node_embeddings = self.gcn_embed()
+    state = state.permute((0, 2, 3, 1))
+    game_board = torch.squeeze(game_board, 1)
+    #emb_sz = node_embeddings.shape[-1]
+    #num_nodes = node_embeddings.shape[0]
+    #b_sz = state.shape[0]
+    #grid_rows = game_board.shape[1]
+    #grid_columns = game_board.shape[2]
+    #print("node_emb", node_embeddings.shape)
+    #print("state", state.shape)
+    #print("game_board", game_board.shape) 
+    for n, embedding in enumerate(node_embeddings):
+           if n in node_2_game_char:
+                indx = (game_board == node_2_game_char[n]).nonzero()
+                state[indx[:, 0], indx[:, 1],indx[:, 2]] += embedding
+    return state.permute((0, 3, 1, 2))
 
 def self_attention(K, V, Q):
     """
@@ -219,5 +237,43 @@ class CNN_NODE_ATTEN_BLOCK(torch.nn.Module):
                                             axis=-1)
             out_node_embeds = self.final_layer(out_node_embeds)
             conv_out = embed_state(game_board, conv_out, out_node_embeds,
+                                   self.node_2_game_char)
+        return conv_out
+
+
+class CNN_2D_NODE_BLOCK(torch.nn.Module):
+
+    def __init__(self, in_channels, out_channels, kernel, node_embed_size,
+                 node_2_game_char, proj_embs):
+        #super(CNN_NODE_ATTEN_BLOCK, self).__init__()
+        super(CNN_2D_NODE_BLOCK, self).__init__()
+        self.node_2_game_char = node_2_game_char
+        self.conv_layer = torch.nn.Conv2d(in_channels,
+                                          out_channels,
+                                          kernel_size=(kernel, kernel),
+                                          stride=1,
+                                          padding=(kernel // 2, kernel // 2))
+        self.proj_embs = proj_embs
+
+        if self.proj_embs:
+            self.final_layer = torch.nn.Linear(node_embed_size,
+                                               out_channels)
+
+    def forward(self, game_board, state, node_embeds, goal_embed):
+        conv_out = self.conv_layer(state)  #do a convolution of state
+        if self.proj_embs:
+            #node_embeds = node_embeds.view(1, node_embeds.shape[0],
+                                          # node_embeds.shape[1]).repeat(
+                                           #    goal_embed.shape[0], 1, 1)
+            #goal_embeddings = goal_embed.view(goal_embed.shape[0], 1,
+                                            #  -1).repeat(
+                                             #     1, node_embeds.shape[1], 1)
+           # if self.use_self_atten:
+           #     out_node_embeds = self.node_atten(node_embeds, goal_embeddings)
+           # else:
+            #out_node_embeds = torch.cat((node_embeds, goal_embeddings),
+                                     #       axis=-1)
+            out_node_embeds = self.final_layer(node_embeds)
+            conv_out = embed_state2D(game_board, conv_out, out_node_embeds,
                                    self.node_2_game_char)
         return conv_out
