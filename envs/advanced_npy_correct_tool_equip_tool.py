@@ -44,15 +44,14 @@ class MalmoEnvSpecial(gym.Env):
     def arena_obs(self, add_selected_item=True, add_goal=True,add_inv=True):
         cur_arena = self.arena.copy()
         if add_selected_item:
-            cur_arena[self.player_y][self.player_x] = self.inventory[
-                self.selected_inv_item]
+            cur_arena[self.player_y][self.player_x] = self.equipped_item #self.inventory[self.selected_inv_item]
         obs = cur_arena[self.player_y - 4:self.player_y + 5,
                         self.player_x - 4:self.player_x + 5]
         if add_inv:
-            if self.selected_inv_item == 0:
-               inv_obs = self.inventory
-            else:
-               inv_obs = np.concatenate((self.inventory[self.selected_inv_item:],self.inventory[:self.selected_inv_item]))
+#             if self.selected_inv_item == 0:
+            inv_obs = self.inventory
+#             else:
+#                inv_obs = self.inventory # np.concatenate((self.inventory[self.selected_inv_item:],self.inventory[:self.selected_inv_item]))
             obs = np.concatenate((inv_obs.reshape(-1,1), obs),axis=1)
             
         if add_goal:
@@ -86,7 +85,8 @@ class MalmoEnvSpecial(gym.Env):
         self.using = False
         self.steps = 0
         self.inventory = np.array([3,6,9,11,0,0,0,0,0])
-        self.selected_inv_item = 0 
+#         self.selected_inv_item = 0 
+        self.equipped_item = 0
         return self.arena_obs()
 
     def check_reached_goal(self):
@@ -113,15 +113,21 @@ class MalmoEnvSpecial(gym.Env):
                 return True
         return False
 
-    def shift_inv(self):
-        if np.sum(self.inventory) == 0: 
-            pass
+#     def shift_inv(self):
+#         if np.sum(self.inventory) == 0: 
+#             pass
+#         else:
+#            shift = 0
+#            while self.inventory[self.selected_inv_item] == 0 or shift == 0:
+#                self.selected_inv_item+= 1
+#                self.selected_inv_item = self.selected_inv_item % len(self.inventory)
+#                shift+=1
+
+    def equip(self,value):
+        if self.object_2_index[value] in self.inventory:
+            self.equipped_item = self.object_2_index[value]
         else:
-           shift = 0
-           while self.inventory[self.selected_inv_item] == 0 or shift == 0:
-               self.selected_inv_item+= 1
-               self.selected_inv_item = self.selected_inv_item % len(self.inventory)
-               shift+=1
+            self.equipped_item = 0
 
     def step(self, action):
         if action >= len(self.actions) or action < 0:
@@ -153,8 +159,14 @@ class MalmoEnvSpecial(gym.Env):
             elif self.actions[action] == "use 1":
                 self.using = True
                 self.attacking = False
-            elif self.actions[action] == "shift":
-                self.shift_inv()
+            elif self.actions[action] == "equip pickaxe":
+                self.equip("pickaxe")
+            elif self.actions[action] == "equip axe":
+                self.equip("axe")            
+            elif self.actions[action] == "equip hoe":
+                self.equip("hoe")
+             elif self.actions[action] == "equip bucket":
+                self.equip("bucket")
         if self.arena[self.player_y][self.player_x] in self.collectable:
             if self.insert_inv(self.arena[self.player_y][self.player_x]):
                 self.arena[self.player_y][self.player_x] = 0
@@ -180,15 +192,17 @@ class MalmoEnvSpecial(gym.Env):
         if self.using:
             if self.arena[self.player_y +
                           1][self.player_x] == self.object_2_index["dirt"]:
-                if self.inventory[self.selected_inv_item] == self.object_2_index["hoe_item"]:
+                if self.equipped_item == self.object_2_index["hoe_item"]: #self.inventory[self.selected_inv_item] == self.object_2_index["hoe_item"]:
                     self.arena[self.player_y + 1][
                         self.player_x] = self.object_2_index["farmland"]
             if self.arena[self.player_y +
                           1][self.player_x] == self.object_2_index["water"]:
-                if self.inventory[self.selected_inv_item] == self.object_2_index["bucket_item"]:
+                if self.equipped_item == self.object_2_index["bucket_item"]: #self.inventory[self.selected_inv_item] == self.object_2_index["bucket_item"]:
                     #	print("using bucket in inventory")
+                    self.equipped_item == self.object_2_index["water_bucket_item"]
                     self.arena[self.player_y + 1][self.player_x] = 0
-                    self.inventory[self.selected_inv_item] = self.object_2_index["water_bucket_item"]
+                    locations = np.where(self.inventory == self.equipped_item)
+                    self.inventory[locations[0]] = self.equipped_item
 
         self.attacking = False
         self.using = False
@@ -221,7 +235,7 @@ class MalmoEnvSpecial(gym.Env):
 
         self.actions = [
             "movenorth", "movesouth", "movewest", "moveeast", "attack 0",
-            "attack 1", "use 0", "use 1","shift"
+            "attack 1", "use 0", "use 1","equip pickaxe","equip axe","equip hoe","equip bucket"
         ]
         self.action_space = Discrete(len(self.actions))
         self.observation_space = (9,10)
