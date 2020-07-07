@@ -171,7 +171,7 @@ def self_attention(K, V, Q):
     query_key_scores_raw = query_key_scores_raw / np.sqrt(
         key_size
     )  # THIS LINE IS NOT NEEDED, just running it to test perplexity/see if it does better
-    weights = F.softmax(query_key_scores_raw)
+    weights = F.softmax(query_key_scores_raw,-1)
     build_new_embeds = torch.matmul(weights, V)
 
     return build_new_embeds
@@ -277,3 +277,57 @@ class CNN_2D_NODE_BLOCK(torch.nn.Module):
             conv_out = embed_state2D(game_board, conv_out, out_node_embeds,
                                    self.node_2_game_char)
         return conv_out
+
+class LINEAR_INV_BLOCK(torch.nn.Module):
+
+    def __init__(self,input_embed_sz, output_size,node_2_game_char,n=9):
+        #super(CNN_NODE_ATTEN_BLOCK, self).__init__()
+        super(LINEAR_INV_BLOCK, self).__init__()
+
+        self.final_layer = torch.nn.Linear(n*input_embed_sz,
+                                               output_size)
+        self.n = n
+        self.node_2_game_char = node_2_game_char
+        self.input_embed_sz = input_embed_sz
+
+    def forward(self, inventory, node_embeds,goal_embed=None):
+         inventory = inventory[:,:self.n]
+         inv_state = torch.zeros_like(inventory).float()
+         inv_state = inv_state.unsqueeze(-1).repeat(1,1,self.input_embed_sz)
+
+         for n, embedding in enumerate(node_embeds):
+               if n in self.node_2_game_char:
+                   indx = (inventory == self.node_2_game_char[n]).nonzero()
+                   inv_state[indx[:, 0], indx[:, 1]] = embedding
+         out = self.final_layer(inv_state.view(inv_state.shape[0],-1))
+        
+         return out
+
+class GOAL_ATTEN_INV_BLOCK(torch.nn.Module):
+
+    def __init__(self,input_embed_sz, output_size,node_2_game_char,n=9):
+        #super(CNN_NODE_ATTEN_BLOCK, self).__init__()
+        super(GOAL_ATTEN_INV_BLOCK, self).__init__()
+
+        self.input_embed_sz = input_embed_sz
+        self.keys = torch.nn.Linear(input_embed_sz,input_embed_sz,bias=False)
+        self.final_layer = torch.nn.Linear(input_embed_sz,
+                                               output_size)
+        self.n = n
+        self.node_2_game_char = node_2_game_char
+
+    def forward(self, inventory, node_embeds,goal_embed):
+         inventory = inventory[:,:self.n]
+         inv_state = torch.zeros_like(inventory).float()
+         inv_state = inv_state.unsqueeze(-1).repeat(1,1,self.input_embed_sz)
+
+         for n, embedding in enumerate(node_embeds):
+               if n in self.node_2_game_char:
+                   indx = (inventory == self.node_2_game_char[n]).nonzero()
+                   inv_state[indx[:, 0], indx[:, 1]] = embedding
+
+         K = self.keys(inv_state)
+         inv_state = self_attention(K,inv_state,goal_embed.unsqueeze(1))
+         out = self.final_layer(inv_state.view(inv_state.shape[0],-1))
+
+         return out

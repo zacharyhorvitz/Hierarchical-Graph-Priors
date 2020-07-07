@@ -19,6 +19,7 @@ from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 
 from envs.advanced_malmo_numpy_env_all_tools import MalmoEnvSpecial as EnvNpyAllTools
 from envs.advanced_malmo_numpy_env_correct_tool import MalmoEnvSpecial as EnvNpyCorrectTool
+from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as EnvNpyAllToolsEquip
 
 args = parse_args()
 # Setting cuda seeds
@@ -43,6 +44,9 @@ elif args.env == 'npy_stone':
 elif args.env == 'adv_npy_all_tools':
     env = EnvNpyAllTools(random=True, mission=None)
     test_env = EnvNpyAllTools(random=True, mission=None)
+elif args.env == 'adv_npy_all_tools_equip':
+    env = EnvNpyAllToolsEquip(random=True, mission=None)
+    test_env = EnvNpyAllToolsEquip(random=True, mission=None)
 elif args.env == 'adv_npy_correct_tool':
     env = EnvNpyCorrectTool(random=True, mission=None)
     test_env = EnvNpyCorrectTool(random=True, mission=None)
@@ -92,7 +96,7 @@ else:
 # Initialize model
 agent_args = {
     "device": device,
-    "state_space": env.observation_space,
+    "state_space": (env.observation_space[0],env.observation_space[1]-1),
     "action_space": env.action_space,
     "num_actions": num_actions,
     "target_moving_average": args.target_moving_average,

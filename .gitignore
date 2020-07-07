@@ -144,3 +144,5 @@ plots/
 slurm/
 .onager
 scripts/
+archive/
+images/

@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK, NodeAtten, embed_state, self_attention
+from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, GOAL_ATTEN_INV_BLOCK, NodeAtten, embed_state2D, self_attention
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience',
@@ -271,6 +271,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         if extract_goal:
             goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
             state = state[:, :, :, 1:]
+      
         #   print(goals)
 
         #print(self.mode,self.hier)
@@ -412,7 +413,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
     def build_model(self):
 
-        node_2_game_char = self.build_gcn(self.mode, self.hier)
+        self.node_2_game_char = self.build_gcn(self.mode, self.hier)
 
 #        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
          #                                   node_2_game_char,
@@ -422,17 +423,34 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
          #                                   node_2_game_char,
          #                                   self.self_attention,
          #                                   self.mode != 'cnn')
-
-        self.block_1 = CNN_2D_NODE_BLOCK(1, 32, 3, self.emb_size,
-                                            node_2_game_char,
-                                            self.mode != 'cnn')
-        self.block_2 = CNN_2D_NODE_BLOCK(32, 32, 3, self.emb_size,
-                                            node_2_game_char,
-                                            self.mode != 'cnn')
+        self.embeds = torch.nn.Embedding(20, self.num_frames)
+        self.body = torch.nn.Sequential(*[
+            torch.nn.Conv2d(self.num_frames, 32, kernel_size=(3, 3), stride=1),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
+            torch.nn.ReLU()  #,
+            # torch.nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1),
+            # torch.nn.ReLU(),
+            # torch.nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1),
+            # torch.nn.ReLU()
+        ])
+        #print(self.input_shape)
+        #exit()
+        final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
+        #print(final_size)
+        final_size = conv2d_size_out(final_size, (3, 3), 1)
+      #  self.block_1 = CNN_2D_NODE_BLOCK(1, 32, 3, self.emb_size,
+             #                               self.node_2_game_char,
+              #                              self.mode != 'cnn')
+       # self.block_2 = CNN_2D_NODE_BLOCK(32, 32, 3, self.emb_size,
+               #                             self.node_2_game_char,
+                #                            self.mode != 'cnn')
+        self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,self.node_2_game_char,n=5)
+        #self.inv_block = GOAL_ATTEN_INV_BLOCK(self.emb_size,self.emb_size,node_2_game_char,n=5)
         self.head = torch.nn.Sequential(*[
             torch.nn.Linear(
-                self.input_shape[0] * self.input_shape[1] * 32 +
-                self.emb_size, self.final_dense_layer),
+                final_size[0]*final_size[1]*32+ # self.input_shape[0] * self.input_shape[1] * 32 +
+                self.emb_size*2, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
@@ -665,13 +683,20 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         print("...finished initializing gcn")
 
-    def forward(self, state, extract_goal=True):
+    def forward(self, state, extract_goal=True,extract_inv=True):
         #print(state.shape)
         if extract_goal:
             goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
             state = state[:, :, :, 1:]
+        if extract_inv:
+            inventory = state[:, :, :, 0].clone().squeeze(1).detach().long()
+            state = state[:, :, :, 1:].long()
+            equipped = state[:,:,4,4].clone().detach().long()
+            inventory = torch.cat((equipped,inventory),1)
+          #  print(equipped.shape)
+         #   print(inventory.shape)
         #   print(goals)
-
+   #     exit()
         #print(self.mode,self.hier)
 
         graph_modes = {
@@ -694,13 +719,20 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             print("Invalid mode")
             sys.exit()
 
-        out = self.block_1(state, state, node_embeds, goal_embeddings)
-        out = F.relu(out)
-        out = self.block_2(state, out, node_embeds, goal_embeddings)
-        out = F.relu(out)
+        embedded_state = self.embeds(state.reshape(state.shape[0],-1)).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
+        #print(embedded_state.shape)
+        #print(state.shape)
+        #print(node_embeds.shape)
+        state = embed_state2D(state,embedded_state, node_embeds, self.node_2_game_char)
+        out = self.body(state) #self.block_1(state, state, node_embeds, goal_embeddings)
+     #   out = F.relu(out)
+     #   out = self.block_2(state, out, node_embeds, goal_embeddings)
+     #   out = F.relu(out)
+        inv_encoded = self.inv_block(inventory,node_embeds,goal_embeddings)
 
         cnn_output = out.reshape(out.size(0), -1)
-        cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
+        #print(inv_encoded.shape)
+        cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
         q_value = self.head(cnn_output)
 
         #         elif self.mode == "embed_bl":
@@ -874,4 +906,5 @@ class DQN_agent:
                 1 - (global_steps - self.warmup_period) / self.epsilon_decay)
         if writer:
             writer.add_scalar('training/epsilon', self.online.epsilon,
+
                               global_steps)
