@@ -81,7 +81,7 @@ def parse_args():
     parser.add_argument('--max-steps',
                         help='Number of steps to run for',
                         type=int,
-                        default=2000000,
+                        default=5000000,
                         required=False)
     parser.add_argument('--checkpoint-steps',
                         help='Checkpoint every so often',
@@ -187,6 +187,15 @@ def parse_args():
                         action='store_true',
                         required=False)
     
+    parser.add_argument('--use_layers',
+                        help='number of GCN layers',
+                        type=int,
+                        default=3,
+                        required=False)
+    parser.add_argument('--reverse_direction',
+                        help='reverse directionality of edges in adj matrix',
+                        action='store_true',
+                        required=False)
     return parser.parse_args()
 
 

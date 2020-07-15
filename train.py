@@ -116,6 +116,8 @@ agent_args = {
     "multi_edge": args.multi_edge,
     "use_glove": args.use_glove,
     "self_attention": args.self_attention,
+    "use_layers": args.use_layers,
+    "reverse_direction": args.reverse_direction
 }
 agent = DQN_agent(**agent_args)
 

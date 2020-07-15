@@ -41,8 +41,14 @@ class MalmoEnvSpecial(gym.Env):
 
         return arena
 
-    def arena_obs(self, add_selected_item=True, add_goal=True,add_inv=True):
+    def arena_obs(self, add_selected_item=True, add_goal=True,add_inv=True,render=False):
         cur_arena = self.arena.copy()
+        if render:
+           god_view = self.arena.copy()
+           god_view[self.player_y][self.player_x] = -1
+           print(god_view)
+           print("EQUIPPED:",self.equipped_item) 
+           print(self.inventory)
         if add_selected_item:
             cur_arena[self.player_y][self.player_x] = self.equipped_item #self.inventory[self.selected_inv_item]
         obs = cur_arena[self.player_y - 4:self.player_y + 5,

@@ -23,7 +23,8 @@ class GCN(torch.nn.Module):
                  atten=False,
                  one_layer=False,
                  node_glove_embed=None,
-                 emb_size=16):
+                 emb_size=16,
+                 use_layers=3):
         super(GCN, self).__init__()
 
         print("starting init")
@@ -48,6 +49,7 @@ class GCN(torch.nn.Module):
         self.A = [x.to(device) for x in A_raw]
         self.use_graph = use_graph
         self.num_edges = len(A_raw)
+        self.use_layers = use_layers
         if self.use_graph:
             if self.atten:
                 print('Using attention')
@@ -55,10 +57,10 @@ class GCN(torch.nn.Module):
                     torch.nn.Parameter(A.detach(), requires_grad=True)
                     for A in A_raw
                 ])
-
-            self.layer_sizes = [(self.emb_sz, self.emb_sz // self.num_edges),
-                                (self.emb_sz, self.emb_sz // self.num_edges),
-                                (self.emb_sz, self.emb_sz // self.num_edges)]
+            self.layer_sizes = [(self.emb_sz, self.emb_sz // self.num_edges)] * self.use_layers
+            #self.layer_sizes = [(self.emb_sz, self.emb_sz // self.num_edges),
+            #                    (self.emb_sz, self.emb_sz // self.num_edges),
+            #                    (self.emb_sz, self.emb_sz // self.num_edges)]
             self.num_layers = len(self.layer_sizes)
             self.weights = [[
                 torch.nn.Linear(in_dim, out_dim, bias=False).to(device)

@@ -384,7 +384,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         emb_size=16,
         multi_edge=False,
         use_glove=False,
-        self_attention=False):
+        self_attention=False,
+        reverse_direction=False,
+        use_layers=3):
         """Defining DQN CNN model
         """
         # initialize all parameters
@@ -408,13 +410,15 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.multi_edge = multi_edge
         self.use_glove = use_glove
         self.self_attention = self_attention
+        self.reverse_direction = reverse_direction
+        self.use_layers = use_layers
         print("building model")
         self.build_model()
 
     def build_model(self):
 
-        self.node_2_game_char = self.build_gcn(self.mode, self.hier)
-
+        self.node_2_game_char = self.build_gcn(self.mode, self.hier, self.use_layers, self.reverse_direction)
+        self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
 #        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
          #                                   node_2_game_char,
          #                                   self.self_attention,
@@ -459,7 +463,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
-    def build_gcn(self, mode, hier):
+    def build_gcn(self, mode, hier, use_layers, reverse_direction):
 
         #if hier and mode != "skyline" and mode != "ling_prior" and mode != "skyline_simple":
         #    print("{} incompatible mode with hier".format(mode))
@@ -633,12 +637,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             for s, d in edges[edge_type]:
                 adjacency[edge_type][name_2_node[d]][
                     name_2_node[s]] = 1.0  #corrected transpose!!!!
+        if self.reverse_direction: adjacency = torch.transpose(adjacency, 1, 2)
         if mode == "fully_connected":
             adjacency = torch.FloatTensor(torch.ones(1, num_nodes, num_nodes))
 
         if self.use_glove:
             import json
-            with open("mine_embs.json", "r", encoding="latin-1") as glove_file:
+            with open("mine_embs_deepwalk.json", "r", encoding="latin-1") as glove_file:
                 glove_dict = json.load(glove_file)
 
                 if mode in ["skyline", "skyline_atten"]:
@@ -677,7 +682,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                        use_graph=use_graph,
                        atten=self.atten,
                        emb_size=self.emb_size,
-                       node_glove_embed=node_glove_embed)
+                       node_glove_embed=node_glove_embed,
+                       use_layers=use_layers)
 
         return self.gcn.node_to_game_char
 
@@ -707,23 +713,30 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         }
 
         if self.mode in graph_modes:
-            node_embeds = self.gcn.gcn_embed()
+            node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
             goal_embeddings = node_embeds[[
                 self.gcn.game_char_to_node[g.item()] for g in goals
             ]]
         elif self.mode == "cnn":
-            node_embeds = None
-            goal_embeddings = self.gcn.obj_emb(goals)
+            #print("reconfigure")
+            #exit()
+            #node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
+            #goal_embeddings = self.gcn.obj_emb(goals)
 
+            node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
+            goal_embeddings = node_embeds[[
+                self.gcn.game_char_to_node[g.item()] for g in goals
+            ]]
         else:
             print("Invalid mode")
             sys.exit()
-
-        embedded_state = self.embeds(state.reshape(state.shape[0],-1)).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
+        if self.mode != "cnn":
+            embedded_state = self.embeds(state.reshape(state.shape[0],-1)).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
+            state = embed_state2D(state,embedded_state, node_embeds, self.node_2_game_char)
+        else: state = state.float()
         #print(embedded_state.shape)
         #print(state.shape)
         #print(node_embeds.shape)
-        state = embed_state2D(state,embedded_state, node_embeds, self.node_2_game_char)
         out = self.body(state) #self.block_1(state, state, node_embeds, goal_embeddings)
      #   out = F.relu(out)
      #   out = self.block_2(state, out, node_embeds, goal_embeddings)
@@ -732,7 +745,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         cnn_output = out.reshape(out.size(0), -1)
         #print(inv_encoded.shape)
-        cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
+        #print(cnn_output.shape)
+        #print(goal_embeddings.shape)
+        #print(inv_encoded.shape)
+        #cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
+        #No relu on goal
+        cnn_output = torch.cat((cnn_output, goal_embeddings,F.relu(inv_encoded)), -1)
         q_value = self.head(cnn_output)
 
         #         elif self.mode == "embed_bl":
@@ -796,7 +814,9 @@ class DQN_agent:
                  emb_size=16,
                  multi_edge=False,
                  use_glove=False,
-                 self_attention=False):
+                 self_attention=False,
+                 use_layers=3,
+                 reverse_direction=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
@@ -814,7 +834,9 @@ class DQN_agent:
                                               atten=atten,
                                               multi_edge=multi_edge,
                                               use_glove=use_glove,
-                                              emb_size=emb_size)
+                                              emb_size=emb_size,
+                                              use_layers=use_layers,
+                                              reverse_direction=reverse_direction)
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
                                               action_space,
@@ -825,7 +847,9 @@ class DQN_agent:
                                               atten=atten,
                                               multi_edge=multi_edge,
                                               use_glove=use_glove,
-                                              emb_size=emb_size)
+                                              emb_size=emb_size,
+                                              use_layers=use_layers,
+                                              reverse_direction=reverse_direction)
 
             #stone's adjacencies [1,0,1]
             #pickaxe's adjacencies [1,1,0]

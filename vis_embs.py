@@ -35,6 +35,9 @@ object_to_char = {
             "farmland_item":15
         }
 
+include = {"pickaxe_item","water_bucket_item","bucket_item","axe_item","farmland_item","hoe_item","log","cobblestone_item"}
+
+
 char_to_obj = {v:k for k,v in object_to_char.items()}
 
         #object_to_char = {"air":0,"bedrock":1,"stone":2,"pickaxe_item":3,"cobblestone_item":4,"log":5,"axe_item":6,"dirt":7,"farmland":8,"hoe_item":9,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
@@ -47,9 +50,13 @@ char_to_obj = {v:k for k,v in object_to_char.items()}
 checkpoint = torch.load(sys.argv[1],map_location=torch.device('cpu'))
 params = checkpoint["model_state_dict"]
 for name in params.keys():
-    if "obj" in name:
+   # if "obj" in name:
+    if "embed" in name:
         print(name)
+       # continue
+        print(params[name].shape)
         for i,p in enumerate(params[name]):
+             if not i in char_to_obj: continue
              print("\n")
              print(char_to_obj[i])
              print(p)
