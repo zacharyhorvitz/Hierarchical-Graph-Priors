@@ -152,7 +152,7 @@ def embed_state2D(game_board, state, node_embeddings, node_2_game_char):
     for n, embedding in enumerate(node_embeddings):
            if n in node_2_game_char:
                 indx = (game_board == node_2_game_char[n]).nonzero()
-                state[indx[:, 0], indx[:, 1],indx[:, 2]] += embedding
+                state[indx[:, 0], indx[:, 1],indx[:, 2]] = embedding # += embedding
     return state.permute((0, 3, 1, 2))
 
 def self_attention(K, V, Q):

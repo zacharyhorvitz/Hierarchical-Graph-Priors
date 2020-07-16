@@ -530,7 +530,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             edges = [skyline_edges, hier_edges]
             use_graph = True
 
-        elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"]:
+        elif mode in ["skyline_hier","skyline_hier_dw_noGCN", "skyline_hier_atten", "fully_connected"]:
             latent_nodes = ["edge_tool", "tool", "material", "product"]
             edges = [[("pickaxe_item", "stone"), ("axe_item", "log"),
                       ("hoe_item", "dirt"), ("bucket_item", "water"),
@@ -709,24 +709,31 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "skyline", "skyline_hier", "skyline_atten", "skyline_hier_atten",
             "skyline_simple", "skyline_simple_atten", "skyline_simple_trash",
             "ling_prior", "fully_connected", "skyline_hier_multi",
-            "skyline_hier_multi_atten"
+            "skyline_hier_multi_atten","skyline_hier_dw_noGCN"
         }
 
         if self.mode in graph_modes:
-            node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
+          #  node_embeds = self.node_embeds_from_dw 
+            if self.mode == "skyline_hier_dw_noGCN":
+
+               node_embeds = self.node_embeds_from_dw
+               #print("use dw embeds instead of gcn")
+
+            else:
+               node_embeds = self.gcn.gcn_embed()
             goal_embeddings = node_embeds[[
                 self.gcn.game_char_to_node[g.item()] for g in goals
             ]]
         elif self.mode == "cnn":
             #print("reconfigure")
             #exit()
-            #node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
-            #goal_embeddings = self.gcn.obj_emb(goals)
+            node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
+            goal_embeddings = self.gcn.obj_emb(goals)
 
-            node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
-            goal_embeddings = node_embeds[[
-                self.gcn.game_char_to_node[g.item()] for g in goals
-            ]]
+            #node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
+            #goal_embeddings = node_embeds[[
+            #    self.gcn.game_char_to_node[g.item()] for g in goals
+            #]]
         else:
             print("Invalid mode")
             sys.exit()
@@ -748,9 +755,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #print(cnn_output.shape)
         #print(goal_embeddings.shape)
         #print(inv_encoded.shape)
-        #cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
-        #No relu on goal
-        cnn_output = torch.cat((cnn_output, goal_embeddings,F.relu(inv_encoded)), -1)
+        if self.mode != "skyline_hier_dw_noGCN":
+           cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
+        else:
+           #No relu on goal
+           cnn_output = torch.cat((cnn_output, goal_embeddings,F.relu(inv_encoded)), -1)
         q_value = self.head(cnn_output)
 
         #         elif self.mode == "embed_bl":
