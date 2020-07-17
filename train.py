@@ -10,7 +10,11 @@ from torch.utils.tensorboard import SummaryWriter
 #import minerl
 
 from utils import parse_args, append_timestamp
-from model import DQN_agent, Experience
+
+if args.env == 'npy_easy':
+    from model_easy import DQN_agent, Experience
+else:
+    from model import DQN_agent, Experience
 #https://github.com/pytorch/pytorch/issues/31554
 
 from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
@@ -20,6 +24,8 @@ from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 from envs.advanced_malmo_numpy_env_all_tools import MalmoEnvSpecial as EnvNpyAllTools
 from envs.advanced_malmo_numpy_env_correct_tool import MalmoEnvSpecial as EnvNpyCorrectTool
 from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as EnvNpyAllToolsEquip
+
+from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
 
 args = parse_args()
 # Setting cuda seeds
@@ -38,6 +44,9 @@ run_tag = args.run_tag
 if args.env == 'npy':
     env = EnvNpy(random=True, mission=None)
     test_env = EnvNpy(random=True, mission=None)
+elif args.env == 'npy_easy':
+    env = EnvEasy(random=True, mission=None)
+    test_env = EnvEasy(random=True, mission=None)
 elif args.env == 'npy_stone':
     env = EnvNpy(random=False, mission="pickaxe_stone")
     test_env = EnvNpy(random=False, mission="pickaxe_stone")
