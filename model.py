@@ -418,7 +418,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
     def build_model(self):
 
         self.node_2_game_char = self.build_gcn(self.mode, self.hier, self.use_layers, self.reverse_direction)
-        self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
+        if self.mode == 'skyline_hier_dw_noGCN_dynamic':
+            self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"), dtype=torch.float, requires_grad=True).to(self.device)
+        elif self.mode == 'skyline_hier_dw_noGCN': #default title is static deepwalk embeddings
+            self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
 #        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
          #                                   node_2_game_char,
          #                                   self.self_attention,
@@ -530,7 +533,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             edges = [skyline_edges, hier_edges]
             use_graph = True
 
-        elif mode in ["skyline_hier","skyline_hier_dw_noGCN", "skyline_hier_atten", "fully_connected"]:
+        elif mode in ["skyline_hier","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic", "skyline_hier_atten", "fully_connected"]:
             latent_nodes = ["edge_tool", "tool", "material", "product"]
             edges = [[("pickaxe_item", "stone"), ("axe_item", "log"),
                       ("hoe_item", "dirt"), ("bucket_item", "water"),
@@ -709,12 +712,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "skyline", "skyline_hier", "skyline_atten", "skyline_hier_atten",
             "skyline_simple", "skyline_simple_atten", "skyline_simple_trash",
             "ling_prior", "fully_connected", "skyline_hier_multi",
-            "skyline_hier_multi_atten","skyline_hier_dw_noGCN"
+            "skyline_hier_multi_atten","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"
         }
 
         if self.mode in graph_modes:
           #  node_embeds = self.node_embeds_from_dw 
-            if self.mode == "skyline_hier_dw_noGCN":
+            if self.mode == "skyline_hier_dw_noGCN" or "skyline_hier_dw_noGCN_dynamic":
 
                node_embeds = self.node_embeds_from_dw
                #print("use dw embeds instead of gcn")
@@ -729,11 +732,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             #exit()
             node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
             goal_embeddings = self.gcn.obj_emb(goals)
-
+        elif self.mode == "embed_bl":
+            node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
             #node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
-            #goal_embeddings = node_embeds[[
-            #    self.gcn.game_char_to_node[g.item()] for g in goals
-            #]]
+            goal_embeddings = node_embeds[[
+                self.gcn.game_char_to_node[g.item()] for g in goals
+            ]]
         else:
             print("Invalid mode")
             sys.exit()
@@ -755,7 +759,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #print(cnn_output.shape)
         #print(goal_embeddings.shape)
         #print(inv_encoded.shape)
-        if self.mode != "skyline_hier_dw_noGCN":
+        if self.mode not in ["skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"]:
            cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
         else:
            #No relu on goal
