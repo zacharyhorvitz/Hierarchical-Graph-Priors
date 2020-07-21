@@ -25,7 +25,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         action_space,
         num_actions,
         num_frames=1,
-        final_dense_layer=10, #50,
+        final_dense_layer=16, #32 #50,
         #input_shape=(9, 9),
         mode="skyline",  #skyline,ling_prior,embed_bl,cnn
         hier=False,
@@ -69,8 +69,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         self.node_2_game_char = self.build_gcn(self.mode, self.hier, self.use_layers, self.reverse_direction)
         if self.mode == 'skyline_hier_dw_noGCN_dynamic':
+            exit()
             self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"), dtype=torch.float, requires_grad=True).to(self.device)
         elif self.mode == 'skyline_hier_dw_noGCN': #default title is static deepwalk embeddings
+            exit()
             self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
 #        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
          #                                   node_2_game_char,
@@ -80,10 +82,26 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
          #                                   node_2_game_char,
          #                                   self.self_attention,
          #                                   self.mode != 'cnn')
-        self.embeds = torch.nn.Embedding(20, self.num_frames)
+        self.embeds = torch.nn.Embedding(18, self.num_frames)
+        if self.mode == 'embed_bl_converged_init':
+          #checkpoint = torch.load('saved_models_zach/easyNpyMini/checkpoint_easyNpySmallMini_2__mode_embed_bl__seed_1.tar')
+          checkpoint = torch.load('saved_models_zach/easyNpyMini_embedbl_8_4task/checkpoint_mini_embed_bl_8_4task_1__mode_embed_bl__seed_0_2020-07-19_21:10:24.487867_5000000.tar')
+          self.embeds.weight = torch.nn.Parameter(checkpoint["model_state_dict"]['embeds.weight']) 
+          self.embeds.weight.requires_grad = True
+        elif self.mode == 'static_attribute': 
+            self.embeds.weight = torch.nn.Parameter(torch.FloatTensor(np.load("attribute_vector_neg_8.npy")).to(self.device))
+            self.embeds.weight.requires_grad = False
+        elif self.mode == 'dynamic_attribute': 
+            embed_data = self.embeds.weight.detach().data
+            #embed_data[:,:5] = torch.FloatTensor(np.load("attribute_vector_neg_8.npy")[:,:5])
+            embed_data = torch.FloatTensor(np.load("attribute_vector_neg_8_fourtask.npy"))
+            self.embeds.weight = torch.nn.Parameter(embed_data) #.to(self.device)
+            self.embeds.weight.requires_grad = True
         self.body = torch.nn.Sequential(*[
-            torch.nn.Conv2d(self.num_frames, 1, kernel_size=(1, 1), stride=1),
-            torch.nn.ReLU(),
+            torch.nn.Conv2d(self.num_frames, 8, kernel_size=(2, 2), stride=1), #8
+            torch.nn.ReLU() #, 
+           # torch.nn.Conv2d(4, 4, kernel_size=(1, 1), stride=1),
+           # torch.nn.ReLU() #,
             # torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
             # torch.nn.ReLU()  #,
             # torch.nn.Conv2d(64, 64, kernel_size=(3, 3), stride=1),
@@ -93,7 +111,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         ])
         #print(self.input_shape)
         #exit()
-        final_size = conv2d_size_out(self.input_shape, (1, 1), 1)
+        #final_size = conv2d_size_out(self.input_shape, (1, 1), 1)
         #print(final_size)
         #final_size = conv2d_size_out(final_size, (3, 3), 1)
       #  self.block_1 = CNN_2D_NODE_BLOCK(1, 32, 3, self.emb_size,
@@ -106,7 +124,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #self.inv_block = GOAL_ATTEN_INV_BLOCK(self.emb_size,self.emb_size,node_2_game_char,n=5)
         self.head = torch.nn.Sequential(*[
             torch.nn.Linear(
-                final_size[0]*final_size[1]*1), #+ # self.input_shape[0] * self.input_shape[1] * 32 +
+                8*2,self.final_dense_layer), #+ # self.input_shape[0] * self.input_shape[1] * 32 +
                 # self.emb_size*2, self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
@@ -267,7 +285,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 #      latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
 #     edges = [('farmland', 'farmland'), ('farmland', 'physical_entity'), ('farmland', 'object'), ('abstraction', 'abstraction'), ('abstraction', 'bucket'), ('abstraction', 'dirt'), ('substance', 'substance'), ('substance', 'stone'), ('substance', 'log'), ('substance', 'water'), ('cobblestone', 'cobblestone'), ('cobblestone', 'stone'), ('cobblestone', 'artifact'), ('cobblestone', 'physical_entity'), ('cobblestone', 'object'), ('axe', 'axe'), ('axe', 'artifact'), ('axe', 'physical_entity'), ('axe', 'object'), ('axe', 'edge_tool'), ('axe', 'tool'), ('axe', 'instrumentality'), ('stone', 'substance'), ('stone', 'cobblestone'), ('stone', 'stone'), ('stone', 'artifact'), ('stone', 'dirt'), ('stone', 'water'), ('stone', 'material'), ('stone', 'object'), ('artifact', 'substance'), ('artifact', 'cobblestone'), ('artifact', 'axe'), ('artifact', 'stone'), ('artifact', 'artifact'), ('artifact', 'bucket'), ('artifact', 'log'), ('artifact', 'hoe'), ('artifact', 'water'), ('artifact', 'pickaxe'), ('bucket', 'abstraction'), ('bucket', 'artifact'), ('bucket', 'bucket'), ('bucket', 'object'), ('bucket', 'instrumentality'), ('dirt', 'abstraction'), ('dirt', 'dirt'), ('dirt', 'physical_entity'), ('dirt', 'body_waste'), ('dirt', 'material'), ('physical_entity', 'farmland'), ('physical_entity', 'cobblestone'), ('physical_entity', 'axe'), ('physical_entity', 'dirt'), ('physical_entity', 'physical_entity'), ('physical_entity', 'log'), ('physical_entity', 'hoe'), ('physical_entity', 'water'), ('physical_entity', 'pickaxe'), ('log', 'substance'), ('log', 'artifact'), ('log', 'physical_entity'), ('log', 'log'), ('log', 'material'), ('log', 'instrumentality'), ('hoe', 'artifact'), ('hoe', 'physical_entity'), ('hoe', 'hoe'), ('hoe', 'object'), ('hoe', 'tool'), ('hoe', 'instrumentality'), ('body_waste', 'dirt'), ('body_waste', 'body_waste'), ('body_waste', 'water'), ('water', 'substance'), ('water', 'artifact'), ('water', 'physical_entity'), ('water', 'body_waste'), ('water', 'water'), ('material', 'substance'), ('material', 'stone'), ('material', 'dirt'), ('material', 'log'), ('material', 'material'), ('object', 'farmland'), ('object', 'cobblestone'), ('object', 'axe'), ('object', 'stone'), ('object', 'bucket'), ('object', 'hoe'), ('object', 'object'), ('object', 'pickaxe'), ('edge_tool', 'axe'), ('edge_tool', 'edge_tool'), ('edge_tool', 'pickaxe'), ('tool', 'axe'), ('tool', 'hoe'), ('tool', 'object'), ('tool', 'tool'), ('tool', 'pickaxe'), ('pickaxe', 'artifact'), ('pickaxe', 'physical_entity'), ('pickaxe', 'object'), ('pickaxe', 'edge_tool'), ('pickaxe', 'tool'), ('pickaxe', 'pickaxe'), ('pickaxe', 'instrumentality'), ('instrumentality', 'axe'), ('instrumentality', 'bucket'), ('instrumentality', 'log'), ('instrumentality', 'hoe'), ('instrumentality', 'pickaxe'), ('instrumentality', 'instrumentality'), ('water_bucket', 'water_bucket')]
 #     use_graph = True
-        elif mode == "cnn" or mode == "embed_bl":
+        elif mode in {"cnn", "embed_bl", 'embed_bl_converged_init', 'static_attribute','dynamic_attribute'}:
             use_graph = False
             latent_nodes = []
             edges = []
@@ -357,7 +375,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #   print(goals)
    #     exit()
         #print(self.mode,self.hier)
-
+        state= state.long().to(self.device)
         graph_modes = {
             "skyline", "skyline_hier", "skyline_atten", "skyline_hier_atten",
             "skyline_simple", "skyline_simple_atten", "skyline_simple_trash",
@@ -368,22 +386,25 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         if self.mode in graph_modes:
           #  node_embeds = self.node_embeds_from_dw 
             if self.mode == "skyline_hier_dw_noGCN" or "skyline_hier_dw_noGCN_dynamic":
-
-               node_embeds = self.node_embeds_from_dw
+               pass
+               #node_embeds = self.node_embeds_from_dw
                #print("use dw embeds instead of gcn")
 
             else:
-               node_embeds = self.gcn.gcn_embed()
+               pass
+               #node_embeds = self.gcn.gcn_embed()
             # goal_embeddings = node_embeds[[
             #     self.gcn.game_char_to_node[g.item()] for g in goals
             # ]]
         elif self.mode == "cnn":
             #print("reconfigure")
             #exit()
-            node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
+            pass
+            #node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
             # goal_embeddings = self.gcn.obj_emb(goals)
-        elif self.mode == "embed_bl":
-            node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
+        elif self.mode in ["embed_bl", 'embed_bl_converged_init', 'static_attribute','dynamic_attribute']:
+            pass
+            #node_embeds = self.gcn.obj_emb(torch.arange(15).to(self.device))  #None
             #node_embeds = self.node_embeds_from_dw #self.gcn.gcn_embed()
             # goal_embeddings = node_embeds[[
             #     self.gcn.game_char_to_node[g.item()] for g in goals
@@ -393,7 +414,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             sys.exit()
         if self.mode != "cnn":
             embedded_state = self.embeds(state.reshape(state.shape[0],-1)).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
-            state = embed_state2D(state,embedded_state, node_embeds, self.node_2_game_char)
+            #state = embed_state2D(state,embedded_state, node_embeds, self.node_2_game_char)
+            state = embedded_state
+            state = state.contiguous()
         else: state = state.float()
         #print(embedded_state.shape)
         #print(state.shape)
@@ -404,7 +427,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
      #   out = F.relu(out)
         # inv_encoded = self.inv_block(inventory,node_embeds,goal_embeddings)
 
-        cnn_output = out.reshape(out.size(0), -1)
+        cnn_output = out.contiguous().reshape(out.shape[0], -1).contiguous()
+        #print(cnn_output.shape)
         #print(inv_encoded.shape)
         #print(cnn_output.shape)
         #print(goal_embeddings.shape)

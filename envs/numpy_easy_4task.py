@@ -13,7 +13,7 @@ class MalmoEnvSpecial(gym.Env):
       
         spawn_entities = [] #["stone","log","water","dirt"]+["pickaxe_item","axe_item","bucket_item","hoe_item"]
  
-        all_missions = [mission] # + [random.choice(self.mission_types)]
+        all_missions = [mission] #+ [random.choice(self.mission_types)]
         for m in all_missions:
             if m == "pickaxe_stone":
                 spawn_entities += ["stone","pickaxe_item"]
@@ -27,7 +27,7 @@ class MalmoEnvSpecial(gym.Env):
                 print("Bad mission",m)
                 exit()
 
-        spawn_entities += [random.choice(["stone","log"])]
+        spawn_entities += [random.choice(["stone","log","water","dirt"])]
 
    #     print(self.poss_spawn_loc)
 
@@ -144,9 +144,9 @@ class MalmoEnvSpecial(gym.Env):
                 self.attacking = True
                 self.using = False
                 
-            elif self.actions[action] == "use 1":
-                self.using = True
-                self.attacking = False
+            #elif self.actions[action] == "use 1":
+            #    self.using = True
+            #    self.attacking = False
 
         if self.arena[self.player_y][self.player_x] in self.collectable:
             if self.insert_inv(self.arena[self.player_y][self.player_x]):
@@ -167,15 +167,15 @@ class MalmoEnvSpecial(gym.Env):
                 if self.equipped_item == self.object_2_index["axe_item"]:
                     self.arena[self.player_y + 1][
                         self.player_x] = self.object_2_index["log_item"]
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["dirt"]:
-                self.arena[self.player_y +
-                           1][self.player_x] = self.object_2_index["dirt_item"]
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["farmland"]:
-                self.arena[self.player_y + 1][
-                    self.player_x] = self.object_2_index["farmland_item"]
-        if self.using:
+     #       if self.arena[self.player_y +
+     #                     1][self.player_x] == self.object_2_index["dirt"]:
+     #           self.arena[self.player_y +
+     #                      1][self.player_x] = self.object_2_index["dirt_item"]
+     #       if self.arena[self.player_y +
+     #                     1][self.player_x] == self.object_2_index["farmland"]:
+     #           self.arena[self.player_y + 1][
+     #               self.player_x] = self.object_2_index["farmland_item"]
+    #    if self.using:
             if self.arena[self.player_y +
                           1][self.player_x] == self.object_2_index["dirt"]:
                 if self.equipped_item == self.object_2_index["hoe_item"]: #self.inventory[self.selected_inv_item] == self.object_2_index["hoe_item"]:
@@ -221,7 +221,7 @@ class MalmoEnvSpecial(gym.Env):
         self.action_space = Discrete(len(self.actions))
         self.observation_space = (2,3)
         self.mission_types = [
-            "pickaxe_stone", "axe_log" #, "hoe_farmland", "bucket_water"
+            "pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"
         ]
         self.step_cost = -0.1
         self.goal_reward = 10.0
