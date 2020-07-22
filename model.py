@@ -676,7 +676,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             node_glove_embed = torch.stack(node_glove_embed)
         else:
             node_glove_embed = None
-
+        self.node_2_name = {v:k for k,v in name_2_node.items()}
         self.gcn = GCN(adjacency,
                        self.device,
                        num_nodes,
@@ -717,13 +717,19 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         if self.mode in graph_modes:
           #  node_embeds = self.node_embeds_from_dw 
-            if self.mode == "skyline_hier_dw_noGCN" or "skyline_hier_dw_noGCN_dynamic":
+            if self.mode == "skyline_hier_dw_noGCN" or self.mode == "skyline_hier_dw_noGCN_dynamic":
 
                node_embeds = self.node_embeds_from_dw
                #print("use dw embeds instead of gcn")
 
             else:
-               node_embeds = self.gcn.gcn_embed()
+               node_embeds = self.gcn.gcn_embed() 
+               #from vis_distance_methods import visualize_similarity,load_embed_from_torch
+               #visualize_similarity(load_embed_from_torch(node_embeds,self.node_2_name),"test_gcn_out")
+               #exit()
+               
+
+
             goal_embeddings = node_embeds[[
                 self.gcn.game_char_to_node[g.item()] for g in goals
             ]]

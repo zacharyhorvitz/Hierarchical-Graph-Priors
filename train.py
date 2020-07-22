@@ -24,6 +24,8 @@ from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as Env
 from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
 from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
 
+from vis_distance_methods import load_embed_from_torch,visualize_similarity
+
 args = parse_args()
 # Setting cuda seeds
 if torch.cuda.is_available():
@@ -184,6 +186,13 @@ episode = 0
 start = time.time()
 end = time.time() + 1
 
+if not os.path.exists(args.dist_save_folder):
+    os.mkdir(args.dist_save_folder)
+
+if args.save_dist_freq != -1:
+  with open(args.mode+"_distance_indices.json","r") as node_name_file:
+      node_to_sim_index = {v:k for k,v in json.load(node_name_file).items()}
+
 if args.load_checkpoint_path and checkpoint is not None:
     global_steps = checkpoint['global_steps']
     episode = checkpoint['episode']
@@ -202,6 +211,12 @@ while global_steps < args.max_steps:
     # Collect data from the environment
     while not done:
         global_steps += 1
+        if args.save_dist_freq != -1 and int(global_steps-1) % args.save_dist_freq == 0:
+            print("SAVING")
+            name_to_embeddings = load_embed_from_torch(agent.online.state_dict()["embeds.weight"],node_to_sim_index)
+            file_name =  os.path.join(args.dist_save_folder, f"checkpoint_{run_tag}")+ f"_{global_steps}"
+            visualize_similarity(name_to_embeddings,file_name)
+            #exit()
         action = agent.online.act(state, agent.online.epsilon)
         next_state, reward, done, info = env.step(action)
         steps += 1
@@ -240,6 +255,7 @@ while global_steps < args.max_steps:
         # Update parameters
         optimizer.step()
         agent.sync_networks()
+            
 
         if args.model_path is not None:
             if global_steps % args.checkpoint_steps == 0:
