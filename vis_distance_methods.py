@@ -1,10 +1,8 @@
 from enum import Enum
 import matplotlib.pyplot as plt
 import numpy as np
-from nltk.corpus import stopwords
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.manifold import TSNE
 from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import cosine_similarity
@@ -108,6 +106,14 @@ def load_embed_from_npy(file_name,names={1:"player",0:"air",2:"stone",3:"pickaxe
 
     return name_to_embedding
 
+def load_embed_from_torch(embeddings,names={1:"player",0:"air",2:"stone",3:"pickaxe_item",4:"cobblestone_item",5:"log",6:"axe_item",13:"log_item"}):
+    name_to_embedding = {}
+    for i,p in enumerate(embeddings):
+        if i in names:
+            name_to_embedding[names[i]] = p.tolist()
+            print(p)
+
+    return name_to_embedding
 
 def visualize_similarity(name_to_embedding,file_name=None):
 
@@ -117,7 +123,7 @@ def visualize_similarity(name_to_embedding,file_name=None):
 
     # np.save("converged_4task_distance.npy",matrix)
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(10, 10))
     im = ax.imshow(matrix)
 
     # We want to show all ticks...
