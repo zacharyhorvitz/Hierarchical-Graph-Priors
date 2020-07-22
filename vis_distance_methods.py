@@ -117,7 +117,7 @@ def visualize_similarity(name_to_embedding,file_name=None):
 
     # np.save("converged_4task_distance.npy",matrix)
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(10, 10))
     im = ax.imshow(matrix)
 
     # We want to show all ticks...
