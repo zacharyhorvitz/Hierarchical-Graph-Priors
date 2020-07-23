@@ -1,0 +1,15 @@
+{"air": 0,
+"wall": 1,
+"stone": 2,
+"pickaxe_item": 3,
+"cobblestone_item": 4,
+"log": 5,
+"axe_item": 6,
+"dirt": 7,
+"farmland": 8,
+"hoe_item": 9,
+"water": 10,
+"bucket_item": 11,
+"water_bucket_item": 12,
+"log_item": 13
+}

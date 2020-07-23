@@ -723,10 +723,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                #print("use dw embeds instead of gcn")
 
             else:
-               node_embeds = self.gcn.gcn_embed() 
-               #from vis_distance_methods import visualize_similarity,load_embed_from_torch
-               #visualize_similarity(load_embed_from_torch(node_embeds,self.node_2_name),"test_gcn_out")
-               #exit()
+               node_embeds = self.gcn.gcn_embed()
+
+               print('WE GOT HEREEEEEE')      
+               
+               from vis_distance_methods import visualize_similarity,load_embed_from_torch
+               visualize_similarity(load_embed_from_torch(node_embeds,self.node_2_name),"test_gcn_out")
+               exit()
                
 
 

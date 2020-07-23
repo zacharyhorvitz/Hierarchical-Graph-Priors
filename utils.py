@@ -196,6 +196,16 @@ def parse_args():
                         help='reverse directionality of edges in adj matrix',
                         action='store_true',
                         required=False)
+    parser.add_argument('--save_dist_freq',
+                        help='save frequency of distances (must have json configured)',
+                        type=int,
+                        default=-1,
+                        required=False)
+    parser.add_argument('--dist_save_folder',
+                        help='path to save images of distances',
+                        type=str,
+                        default="dist_data",
+                        required=False)
     return parser.parse_args()
 
 
