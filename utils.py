@@ -43,6 +43,21 @@ def parse_args():
                         type=float,
                         default=0.99,
                         required=False)
+    parser.add_argument('--contrastive-loss-coeff',
+                        help='Contrastive loss coefficient',
+                        type=float,
+                        default=1,
+                        required=False)
+    parser.add_argument('--negative-margin',
+                        help='Negative margin for contrastive_loss',
+                        type=float,
+                        default=6.5,
+                        required=False)
+    parser.add_argument('--positive-margin',
+                        help='Positive margin for contrastive_loss',
+                        type=float,
+                        default=2.5,
+                        required=False)
     parser.add_argument('--output-path',
                         help='The output directory to store training stats',
                         type=str,

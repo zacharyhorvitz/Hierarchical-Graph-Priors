@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, GOAL_ATTEN_INV_BLOCK, NodeAtten, embed_state2D, self_attention
+from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, GOAL_ATTEN_INV_BLOCK, NodeAtten, embed_state2D, self_attention, contrastive_loss_func
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience',
@@ -164,7 +164,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
-        node_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)} 
+        node_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)}
 
         num_nodes = len(game_nodes + latent_nodes)
 
@@ -271,7 +271,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         if extract_goal:
             goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
             state = state[:, :, :, 1:]
-      
+
         #   print(goals)
 
         #print(self.mode,self.hier)
@@ -423,13 +423,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         elif self.mode == 'skyline_hier_dw_noGCN': #default title is static deepwalk embeddings
             self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
 #        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
-         #                                   node_2_game_char,
-         #                                   self.self_attention,
-         #                                   self.mode != 'cnn')
- #       self.block_2 = CNN_NODE_ATTEN_BLOCK(32, 32, 3, self.emb_size,
-         #                                   node_2_game_char,
-         #                                   self.self_attention,
-         #                                   self.mode != 'cnn')
+#                                   node_2_game_char,
+#                                   self.self_attention,
+#                                   self.mode != 'cnn')
+#       self.block_2 = CNN_NODE_ATTEN_BLOCK(32, 32, 3, self.emb_size,
+#                                   node_2_game_char,
+#                                   self.self_attention,
+#                                   self.mode != 'cnn')
         self.embeds = torch.nn.Embedding(20, self.num_frames)
         self.body = torch.nn.Sequential(*[
             torch.nn.Conv2d(self.num_frames, 32, kernel_size=(3, 3), stride=1),
@@ -446,12 +446,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         final_size = conv2d_size_out(self.input_shape, (3, 3), 1)
         #print(final_size)
         final_size = conv2d_size_out(final_size, (3, 3), 1)
-      #  self.block_1 = CNN_2D_NODE_BLOCK(1, 32, 3, self.emb_size,
-             #                               self.node_2_game_char,
-              #                              self.mode != 'cnn')
-       # self.block_2 = CNN_2D_NODE_BLOCK(32, 32, 3, self.emb_size,
-               #                             self.node_2_game_char,
-                #                            self.mode != 'cnn')
+        #  self.block_1 = CNN_2D_NODE_BLOCK(1, 32, 3, self.emb_size,
+        #                               self.node_2_game_char,
+        #                              self.mode != 'cnn')
+        # self.block_2 = CNN_2D_NODE_BLOCK(32, 32, 3, self.emb_size,
+        #                             self.node_2_game_char,
+        #                            self.mode != 'cnn')
         self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,self.node_2_game_char,n=5)
         #self.inv_block = GOAL_ATTEN_INV_BLOCK(self.emb_size,self.emb_size,node_2_game_char,n=5)
         self.head = torch.nn.Sequential(*[
@@ -612,10 +612,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                       ('farmland_item', 'farmland_item')]]
 
 
-# edges = [('object', 'stone'), ('material', 'stone'), ('substance', 'stone'), ('artifact', 'stone'), ('stone', 'stone'), ('object', 'bucket_item'), ('abstraction', 'bucket_item'), ('artifact', 'bucket_item'), ('instrumentality', 'bucket_item'), ('bucket_item', 'bucket_item'), ('physical_entity', 'hoe_item'), ('object', 'hoe_item'), ('hoe_item', 'hoe_item'), ('artifact', 'hoe_item'), ('tool', 'hoe_item'), ('instrumentality', 'hoe_item'), ('physical_entity', 'pickaxe_item'), ('object', 'pickaxe_item'), ('artifact', 'pickaxe_item'), ('tool', 'pickaxe_item'), ('edge_tool', 'pickaxe_item'), ('pickaxe_item', 'pickaxe_item'), ('instrumentality', 'pickaxe_item'), ('physical_entity', 'axe_item'), ('object', 'axe_item'), ('axe_item', 'axe_item'), ('artifact', 'axe_item'), ('tool', 'axe_item'), ('edge_tool', 'axe_item'), ('instrumentality', 'axe_item'), ('water_bucket_item', 'water_bucket_item'), ('physical_entity', 'log'), ('material', 'log'), ('substance', 'log'), ('artifact', 'log'), ('log', 'log'), ('instrumentality', 'log'), ('farmland', 'farmland'), ('physical_entity', 'farmland'), ('object', 'farmland'), ('physical_entity', 'cobblestone'), ('object', 'cobblestone'), ('artifact', 'cobblestone'), ('cobblestone', 'cobblestone'), ('stone', 'cobblestone'), ('physical_entity', 'water'), ('substance', 'water'), ('artifact', 'water'), ('body_waste', 'water'), ('water', 'water'), ('physical_entity', 'dirt'), ('abstraction', 'dirt'), ('material', 'dirt'), ('dirt', 'dirt'), ('body_waste', 'dirt'), ('cobblestone_item', 'cobblestone_item'), ('dirt_item', 'dirt_item'), ('log_item', 'log_item'), ('farmland_item', 'farmland_item')]
-
-#      latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
-#     edges = [('farmland', 'farmland'), ('farmland', 'physical_entity'), ('farmland', 'object'), ('abstraction', 'abstraction'), ('abstraction', 'bucket'), ('abstraction', 'dirt'), ('substance', 'substance'), ('substance', 'stone'), ('substance', 'log'), ('substance', 'water'), ('cobblestone', 'cobblestone'), ('cobblestone', 'stone'), ('cobblestone', 'artifact'), ('cobblestone', 'physical_entity'), ('cobblestone', 'object'), ('axe', 'axe'), ('axe', 'artifact'), ('axe', 'physical_entity'), ('axe', 'object'), ('axe', 'edge_tool'), ('axe', 'tool'), ('axe', 'instrumentality'), ('stone', 'substance'), ('stone', 'cobblestone'), ('stone', 'stone'), ('stone', 'artifact'), ('stone', 'dirt'), ('stone', 'water'), ('stone', 'material'), ('stone', 'object'), ('artifact', 'substance'), ('artifact', 'cobblestone'), ('artifact', 'axe'), ('artifact', 'stone'), ('artifact', 'artifact'), ('artifact', 'bucket'), ('artifact', 'log'), ('artifact', 'hoe'), ('artifact', 'water'), ('artifact', 'pickaxe'), ('bucket', 'abstraction'), ('bucket', 'artifact'), ('bucket', 'bucket'), ('bucket', 'object'), ('bucket', 'instrumentality'), ('dirt', 'abstraction'), ('dirt', 'dirt'), ('dirt', 'physical_entity'), ('dirt', 'body_waste'), ('dirt', 'material'), ('physical_entity', 'farmland'), ('physical_entity', 'cobblestone'), ('physical_entity', 'axe'), ('physical_entity', 'dirt'), ('physical_entity', 'physical_entity'), ('physical_entity', 'log'), ('physical_entity', 'hoe'), ('physical_entity', 'water'), ('physical_entity', 'pickaxe'), ('log', 'substance'), ('log', 'artifact'), ('log', 'physical_entity'), ('log', 'log'), ('log', 'material'), ('log', 'instrumentality'), ('hoe', 'artifact'), ('hoe', 'physical_entity'), ('hoe', 'hoe'), ('hoe', 'object'), ('hoe', 'tool'), ('hoe', 'instrumentality'), ('body_waste', 'dirt'), ('body_waste', 'body_waste'), ('body_waste', 'water'), ('water', 'substance'), ('water', 'artifact'), ('water', 'physical_entity'), ('water', 'body_waste'), ('water', 'water'), ('material', 'substance'), ('material', 'stone'), ('material', 'dirt'), ('material', 'log'), ('material', 'material'), ('object', 'farmland'), ('object', 'cobblestone'), ('object', 'axe'), ('object', 'stone'), ('object', 'bucket'), ('object', 'hoe'), ('object', 'object'), ('object', 'pickaxe'), ('edge_tool', 'axe'), ('edge_tool', 'edge_tool'), ('edge_tool', 'pickaxe'), ('tool', 'axe'), ('tool', 'hoe'), ('tool', 'object'), ('tool', 'tool'), ('tool', 'pickaxe'), ('pickaxe', 'artifact'), ('pickaxe', 'physical_entity'), ('pickaxe', 'object'), ('pickaxe', 'edge_tool'), ('pickaxe', 'tool'), ('pickaxe', 'pickaxe'), ('pickaxe', 'instrumentality'), ('instrumentality', 'axe'), ('instrumentality', 'bucket'), ('instrumentality', 'log'), ('instrumentality', 'hoe'), ('instrumentality', 'pickaxe'), ('instrumentality', 'instrumentality'), ('water_bucket', 'water_bucket')]
 #     use_graph = True
         elif mode == "cnn" or mode == "embed_bl":
             use_graph = False
@@ -624,7 +620,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
-        node_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)} 
+        node_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)}
 
         num_nodes = len(game_nodes + latent_nodes)
 
@@ -643,6 +639,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         if self.reverse_direction: adjacency = torch.transpose(adjacency, 1, 2)
         if mode == "fully_connected":
             adjacency = torch.FloatTensor(torch.ones(1, num_nodes, num_nodes))
+
+        self.adjacency = adjacency
+        self.edges = edges
+        self.latent_nodes = latent_nodes
 
         if self.use_glove:
             import json
@@ -702,11 +702,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             state = state[:, :, :, 1:].long()
             equipped = state[:,:,4,4].clone().detach().long()
             inventory = torch.cat((equipped,inventory),1)
-          #  print(equipped.shape)
-         #   print(inventory.shape)
+        #  print(equipped.shape)
+        #   print(inventory.shape)
         #   print(goals)
-   #     exit()
-        #print(self.mode,self.hier)
+#     exit()
+#print(self.mode,self.hier)
 
         graph_modes = {
             "skyline", "skyline_hier", "skyline_atten", "skyline_hier_atten",
@@ -716,21 +716,21 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         }
 
         if self.mode in graph_modes:
-          #  node_embeds = self.node_embeds_from_dw 
+            #  node_embeds = self.node_embeds_from_dw
             if self.mode == "skyline_hier_dw_noGCN" or self.mode == "skyline_hier_dw_noGCN_dynamic":
 
-               node_embeds = self.node_embeds_from_dw
-               #print("use dw embeds instead of gcn")
+                node_embeds = self.node_embeds_from_dw
+                #print("use dw embeds instead of gcn")
 
             else:
-               node_embeds = self.gcn.gcn_embed()
+                node_embeds = self.gcn.gcn_embed()
 
-               print('WE GOT HEREEEEEE')      
-               
-               from vis_distance_methods import visualize_similarity,load_embed_from_torch
-               visualize_similarity(load_embed_from_torch(node_embeds,self.node_2_name),"test_gcn_out")
-               exit()
-               
+                # print('WE GOT HEREEEEEE')
+
+                # from vis_distance_methods import visualize_similarity,load_embed_from_torch
+                # visualize_similarity(load_embed_from_torch(node_embeds,self.node_2_name),"test_gcn_out")
+                # exit()
+
 
 
             goal_embeddings = node_embeds[[
@@ -758,9 +758,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #print(state.shape)
         #print(node_embeds.shape)
         out = self.body(state) #self.block_1(state, state, node_embeds, goal_embeddings)
-     #   out = F.relu(out)
-     #   out = self.block_2(state, out, node_embeds, goal_embeddings)
-     #   out = F.relu(out)
+        #   out = F.relu(out)
+        #   out = self.block_2(state, out, node_embeds, goal_embeddings)
+        #   out = F.relu(out)
         inv_encoded = self.inv_block(inventory,node_embeds,goal_embeddings)
 
         cnn_output = out.reshape(out.size(0), -1)
@@ -769,10 +769,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #print(goal_embeddings.shape)
         #print(inv_encoded.shape)
         if self.mode not in ["skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"]:
-           cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
+            cnn_output = torch.cat((cnn_output, F.relu(goal_embeddings),F.relu(inv_encoded)), -1)
         else:
-           #No relu on goal
-           cnn_output = torch.cat((cnn_output, goal_embeddings,F.relu(inv_encoded)), -1)
+            #No relu on goal
+            cnn_output = torch.cat((cnn_output, goal_embeddings,F.relu(inv_encoded)), -1)
         q_value = self.head(cnn_output)
 
         #         elif self.mode == "embed_bl":
@@ -822,6 +822,9 @@ class DQN_agent:
                  num_actions,
                  target_moving_average,
                  gamma,
+                 contrastive_loss_coeff,
+                 positive_margin,
+                 negative_margin,
                  replay_buffer_size,
                  epsilon_decay,
                  epsilon_decay_end,
@@ -842,6 +845,9 @@ class DQN_agent:
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
+        self.contrastive_loss_coeff = contrastive_loss_coeff
+        self.positive_margin = positive_margin
+        self.negative_margin = negative_margin
 
         if model_type == "cnn":
             assert num_frames
@@ -934,7 +940,25 @@ class DQN_agent:
                               writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(),
                               writer_step)
-        return torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+        rl_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+
+        node_embeds = self.online.gcn.gcn_embed()
+        adjacency = self.online.adjacency[0] # NOTE does not support multiple edge types
+        edges = self.online.edges[0] # NOTE does not support multiple edge types
+        latent_nodes = self.online.latent_nodes
+        conversion_dict = self.online.node_2_name
+
+        contrastive_loss = contrastive_loss_func(self.device, 
+                                                 node_embeds,
+                                                 adjacency,
+                                                 latent_nodes,
+                                                 conversion_dict,
+                                                 self.positive_margin,
+                                                 self.negative_margin)
+        # print("RL Loss: {:.2f}, Contrastive Loss: {:.2f}".format(rl_loss.item(),
+        #    contrastive_loss.item()))
+        loss = rl_loss + self.contrastive_loss_coeff * contrastive_loss
+        return loss
 
     def sync_networks(self):
         sync_networks(self.target, self.online, self.target_moving_average)
