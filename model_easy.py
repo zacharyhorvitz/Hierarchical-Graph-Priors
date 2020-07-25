@@ -85,7 +85,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.embeds = torch.nn.Embedding(18, self.num_frames)
         if self.mode == 'embed_bl_converged_init':
           #checkpoint = torch.load('saved_models_zach/easyNpyMini/checkpoint_easyNpySmallMini_2__mode_embed_bl__seed_1.tar')
-          checkpoint = torch.load('saved_models_zach/easyNpyMini_embedbl_8_4task/checkpoint_mini_embed_bl_8_4task_1__mode_embed_bl__seed_0_2020-07-19_21:10:24.487867_5000000.tar')
+          checkpoint = torch.load('saved_models_zach/easyNpyMini_embedbl_8_4task/checkpoint_mini_embed_bl_8_4task_1.tar')
           self.embeds.weight = torch.nn.Parameter(checkpoint["model_state_dict"]['embeds.weight']) 
           self.embeds.weight.requires_grad = True
         elif self.mode == 'static_attribute': 
@@ -129,10 +129,37 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
-
+        self.pairwise = torch.nn.PairwiseDistance(p=2)
+        self.pairwise_loss = torch.nn.MSELoss()
         trainable_parameters = sum(
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
+
+    def build_pairs(self):
+         pairs = set()
+         nodes = [0,1,2,3,4,5,6,7,8,9,10,11,12,13]
+         for n in nodes:
+            for m in nodes:
+               if n == m: continue
+               if sorted((n,m)) in pairs: continue
+               pairs.add(sorted((n,m)))
+         self.pairs = torch.tensor([list(x) for x in pairs])
+       
+    def embed_pairs(self):
+        pairs = self.embeds(self.pairs)
+        dist = self.pairwise(pairs)
+        dist = dist / torch.mean(dist)
+        return dist
+
+    def get_true_dist(self):
+        #TODO: load embedding distance in model init, fix alignment with keys, matrix
+        dist = self.goal_dist[self.pairs]
+        dist = dist / torch.mean(dist)
+        return dist
+
+    def get_pairwise_loss(self):
+        return self.pairwise_loss(self.embed_pairs(),self.get_true_dist())
+        
 
     def build_gcn(self, mode, hier, use_layers, reverse_direction):
 
@@ -164,6 +191,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "dirt_item": 14,
             "farmland_item": 15
         }
+        
         #object_to_char = {"air":0,"bedrock":1,"stone":2,"pickaxe_item":3,"cobblestone_item":4,"log":5,"axe_item":6,"dirt":7,"farmland":8,"hoe_item":9,"water":10,"bucket_item":11,"water_bucket_item":12,"log_item":13,"dirt_item":14,"farmland_item":15}
         non_node_objects = ["air", "wall"]
         game_nodes = sorted(
