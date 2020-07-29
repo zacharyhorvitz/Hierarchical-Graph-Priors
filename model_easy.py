@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, GOAL_ATTEN_INV_BLOCK, NodeAtten, embed_state2D, self_attention
+from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, GOAL_ATTEN_INV_BLOCK, NodeAtten, embed_state2D, self_attention, contrastive_loss_func
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience',
@@ -372,6 +372,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         else:
             node_glove_embed = None
 
+        self.node_2_name = {v:k for k,v in name_2_node.items()}
         self.gcn = GCN(adjacency,
                        self.device,
                        num_nodes,
