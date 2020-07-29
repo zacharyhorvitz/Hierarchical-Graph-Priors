@@ -308,11 +308,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                       ('farmland_item', 'farmland_item')]]
 
 
-# edges = [('object', 'stone'), ('material', 'stone'), ('substance', 'stone'), ('artifact', 'stone'), ('stone', 'stone'), ('object', 'bucket_item'), ('abstraction', 'bucket_item'), ('artifact', 'bucket_item'), ('instrumentality', 'bucket_item'), ('bucket_item', 'bucket_item'), ('physical_entity', 'hoe_item'), ('object', 'hoe_item'), ('hoe_item', 'hoe_item'), ('artifact', 'hoe_item'), ('tool', 'hoe_item'), ('instrumentality', 'hoe_item'), ('physical_entity', 'pickaxe_item'), ('object', 'pickaxe_item'), ('artifact', 'pickaxe_item'), ('tool', 'pickaxe_item'), ('edge_tool', 'pickaxe_item'), ('pickaxe_item', 'pickaxe_item'), ('instrumentality', 'pickaxe_item'), ('physical_entity', 'axe_item'), ('object', 'axe_item'), ('axe_item', 'axe_item'), ('artifact', 'axe_item'), ('tool', 'axe_item'), ('edge_tool', 'axe_item'), ('instrumentality', 'axe_item'), ('water_bucket_item', 'water_bucket_item'), ('physical_entity', 'log'), ('material', 'log'), ('substance', 'log'), ('artifact', 'log'), ('log', 'log'), ('instrumentality', 'log'), ('farmland', 'farmland'), ('physical_entity', 'farmland'), ('object', 'farmland'), ('physical_entity', 'cobblestone'), ('object', 'cobblestone'), ('artifact', 'cobblestone'), ('cobblestone', 'cobblestone'), ('stone', 'cobblestone'), ('physical_entity', 'water'), ('substance', 'water'), ('artifact', 'water'), ('body_waste', 'water'), ('water', 'water'), ('physical_entity', 'dirt'), ('abstraction', 'dirt'), ('material', 'dirt'), ('dirt', 'dirt'), ('body_waste', 'dirt'), ('cobblestone_item', 'cobblestone_item'), ('dirt_item', 'dirt_item'), ('log_item', 'log_item'), ('farmland_item', 'farmland_item')]
-
-#      latent_nodes = ["physical_entity","abstraction","substance","artifact","object","edge_tool","tool","instrumentality","material","body_waste"]
-#     edges = [('farmland', 'farmland'), ('farmland', 'physical_entity'), ('farmland', 'object'), ('abstraction', 'abstraction'), ('abstraction', 'bucket'), ('abstraction', 'dirt'), ('substance', 'substance'), ('substance', 'stone'), ('substance', 'log'), ('substance', 'water'), ('cobblestone', 'cobblestone'), ('cobblestone', 'stone'), ('cobblestone', 'artifact'), ('cobblestone', 'physical_entity'), ('cobblestone', 'object'), ('axe', 'axe'), ('axe', 'artifact'), ('axe', 'physical_entity'), ('axe', 'object'), ('axe', 'edge_tool'), ('axe', 'tool'), ('axe', 'instrumentality'), ('stone', 'substance'), ('stone', 'cobblestone'), ('stone', 'stone'), ('stone', 'artifact'), ('stone', 'dirt'), ('stone', 'water'), ('stone', 'material'), ('stone', 'object'), ('artifact', 'substance'), ('artifact', 'cobblestone'), ('artifact', 'axe'), ('artifact', 'stone'), ('artifact', 'artifact'), ('artifact', 'bucket'), ('artifact', 'log'), ('artifact', 'hoe'), ('artifact', 'water'), ('artifact', 'pickaxe'), ('bucket', 'abstraction'), ('bucket', 'artifact'), ('bucket', 'bucket'), ('bucket', 'object'), ('bucket', 'instrumentality'), ('dirt', 'abstraction'), ('dirt', 'dirt'), ('dirt', 'physical_entity'), ('dirt', 'body_waste'), ('dirt', 'material'), ('physical_entity', 'farmland'), ('physical_entity', 'cobblestone'), ('physical_entity', 'axe'), ('physical_entity', 'dirt'), ('physical_entity', 'physical_entity'), ('physical_entity', 'log'), ('physical_entity', 'hoe'), ('physical_entity', 'water'), ('physical_entity', 'pickaxe'), ('log', 'substance'), ('log', 'artifact'), ('log', 'physical_entity'), ('log', 'log'), ('log', 'material'), ('log', 'instrumentality'), ('hoe', 'artifact'), ('hoe', 'physical_entity'), ('hoe', 'hoe'), ('hoe', 'object'), ('hoe', 'tool'), ('hoe', 'instrumentality'), ('body_waste', 'dirt'), ('body_waste', 'body_waste'), ('body_waste', 'water'), ('water', 'substance'), ('water', 'artifact'), ('water', 'physical_entity'), ('water', 'body_waste'), ('water', 'water'), ('material', 'substance'), ('material', 'stone'), ('material', 'dirt'), ('material', 'log'), ('material', 'material'), ('object', 'farmland'), ('object', 'cobblestone'), ('object', 'axe'), ('object', 'stone'), ('object', 'bucket'), ('object', 'hoe'), ('object', 'object'), ('object', 'pickaxe'), ('edge_tool', 'axe'), ('edge_tool', 'edge_tool'), ('edge_tool', 'pickaxe'), ('tool', 'axe'), ('tool', 'hoe'), ('tool', 'object'), ('tool', 'tool'), ('tool', 'pickaxe'), ('pickaxe', 'artifact'), ('pickaxe', 'physical_entity'), ('pickaxe', 'object'), ('pickaxe', 'edge_tool'), ('pickaxe', 'tool'), ('pickaxe', 'pickaxe'), ('pickaxe', 'instrumentality'), ('instrumentality', 'axe'), ('instrumentality', 'bucket'), ('instrumentality', 'log'), ('instrumentality', 'hoe'), ('instrumentality', 'pickaxe'), ('instrumentality', 'instrumentality'), ('water_bucket', 'water_bucket')]
-#     use_graph = True
         elif mode in {"cnn", "embed_bl", 'embed_bl_converged_init', 'static_attribute','dynamic_attribute'}:
             use_graph = False
             latent_nodes = []
@@ -339,6 +334,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         if self.reverse_direction: adjacency = torch.transpose(adjacency, 1, 2)
         if mode == "fully_connected":
             adjacency = torch.FloatTensor(torch.ones(1, num_nodes, num_nodes))
+
+        self.adjacency = adjacency
+        self.edges = edges
+        self.latent_nodes = latent_nodes
 
         if self.use_glove:
             import json
@@ -515,6 +514,9 @@ class DQN_agent:
                  num_actions,
                  target_moving_average,
                  gamma,
+                 contrastive_loss_coeff,
+                 positive_margin,
+                 negative_margin,
                  replay_buffer_size,
                  epsilon_decay,
                  epsilon_decay_end,
@@ -535,6 +537,9 @@ class DQN_agent:
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
+        self.contrastive_loss_coeff = contrastive_loss_coeff
+        self.positive_margin = positive_margin
+        self.negative_margin = negative_margin
 
         if model_type == "cnn":
             assert num_frames
@@ -627,7 +632,25 @@ class DQN_agent:
                               writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(),
                               writer_step)
-        return torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+        rl_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+
+        node_embeds = self.online.gcn.gcn_embed()
+        adjacency = self.online.adjacency[0] # NOTE does not support multiple edge types
+        edges = self.online.edges[0] # NOTE does not support multiple edge types
+        latent_nodes = self.online.latent_nodes
+        conversion_dict = self.online.node_2_name
+
+        contrastive_loss = contrastive_loss_func(self.device, 
+                                                 node_embeds,
+                                                 adjacency,
+                                                 latent_nodes,
+                                                 conversion_dict,
+                                                 self.positive_margin,
+                                                 self.negative_margin)
+        # print("RL Loss: {:.2f}, Contrastive Loss: {:.2f}".format(rl_loss.item(),
+        #    contrastive_loss.item()))
+        loss = rl_loss + self.contrastive_loss_coeff * contrastive_loss
+        return loss
 
     def sync_networks(self):
         sync_networks(self.target, self.online, self.target_moving_average)
