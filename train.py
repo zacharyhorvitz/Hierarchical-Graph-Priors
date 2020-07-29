@@ -25,7 +25,7 @@ from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as Env
 
 from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
 from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
-# from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
+from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
 from embed_utils.vis_distance_methods import load_embed_from_torch,visualize_similarity
 
 args = parse_args()
