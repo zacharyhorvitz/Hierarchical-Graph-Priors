@@ -11,8 +11,7 @@ from torch.nn.functional import relu
 from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, NodeAtten, self_attention, malmo_build_gcn_param
 from utils import sync_networks, conv2d_size_out
 
-Experience = namedtuple('Experience',
-                        ['state', 'action', 'reward', 'next_state', 'done'])
+Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
 
 
 class DQN_MALMO_CNN_model(torch.nn.Module):
@@ -41,8 +40,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         """
         # initialize all parameters
         super(DQN_MALMO_CNN_model, self).__init__()
-        print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer,
-                                                state_space))
+        print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer, state_space))
         self.state_space = state_space
         self.action_space = action_space
         self.device = device
@@ -64,57 +62,63 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.use_layers = use_layers
         print("building model")
 
-
         self.graph_modes = {
-            "skyline", "skyline_hier", "skyline_atten", "skyline_hier_atten",
-            "skyline_simple", "skyline_simple_atten", "skyline_simple_trash",
-            "ling_prior", "fully_connected", "skyline_hier_multi",
-            "skyline_hier_multi_atten","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"
+            "skyline",
+            "skyline_hier",
+            "skyline_atten",
+            "skyline_hier_atten",
+            "skyline_simple",
+            "skyline_simple_atten",
+            "skyline_simple_trash",
+            "ling_prior",
+            "fully_connected",
+            "skyline_hier_multi",
+            "skyline_hier_multi_atten",
+            "skyline_hier_dw_noGCN",
+            "skyline_hier_dw_noGCN_dynamic"
         }
 
         self.build_model()
 
-    
     def build_env_info(self):
 
         object_to_char = {
-        "air": 0,
-        "wall": 1,
-        "stone": 2,
-        "pickaxe_item": 3,
-        "cobblestone_item": 4,
-        "log": 5,
-        "axe_item": 6,
-        "dirt": 7,
-        "farmland": 8,
-        "hoe_item": 9,
-        "water": 10,
-        "bucket_item": 11,
-        "water_bucket_item": 12,
-        "log_item": 13,
-        "dirt_item": 14,
-        "farmland_item": 15
+            "air": 0,
+            "wall": 1,
+            "stone": 2,
+            "pickaxe_item": 3,
+            "cobblestone_item": 4,
+            "log": 5,
+            "axe_item": 6,
+            "dirt": 7,
+            "farmland": 8,
+            "hoe_item": 9,
+            "water": 10,
+            "bucket_item": 11,
+            "water_bucket_item": 12,
+            "log_item": 13,
+            "dirt_item": 14,
+            "farmland_item": 15
         }
 
         self.object_to_char = object_to_char
 
-
     def build_model(self):
 
-        self.build_env_info() #define env mapping
+        self.build_env_info()  #define env mapping
 
         # if self.mode == 'skyline_hier_dw_noGCN_dynamic':
         #     self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"), dtype=torch.float, requires_grad=True).to(self.device)
         # elif self.mode == 'skyline_hier_dw_noGCN': #default title is static deepwalk embeddings
         #     self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
 
-        if self.state_space == (9,9):
+        if self.state_space == (9, 9):
 
-            self.extract_goal,self.extract_inv = True,True
-
+            self.extract_goal, self.extract_inv = True, True
 
             self.body = torch.nn.Sequential(*[
-                torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 32, kernel_size=(3, 3), stride=1),
+                torch.nn.Conv2d(
+                    self.num_frames if self.mode != "cnn" else 1, 32, kernel_size=(3, 3), stride=1),
                 torch.nn.ReLU(),
                 torch.nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1),
                 torch.nn.ReLU()
@@ -124,16 +128,15 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             final_size = conv2d_size_out(final_size, (3, 3), 1)
 
             self.head = torch.nn.Sequential(*[
-                torch.nn.Linear(
-                    final_size[0]*final_size[1]*32+
-                    self.emb_size*2, self.final_dense_layer),
+                torch.nn.Linear(final_size[0] * final_size[1] * 32 + self.emb_size * 2,
+                                self.final_dense_layer),
                 torch.nn.ReLU(),
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
 
-        elif self.state_space == (2,3):
+        elif self.state_space == (2, 3):
 
-            self.extract_goal,self.extract_inv = False,False
+            self.extract_goal, self.extract_inv = False, False
 
             self.body = torch.nn.Sequential(*[
             torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 8, kernel_size=(2, 2), stride=1), #8
@@ -141,14 +144,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             ])
 
             self.head = torch.nn.Sequential(*[
-                torch.nn.Linear(
-                    8*2,self.final_dense_layer),
+                torch.nn.Linear(8 * 2, self.final_dense_layer),
                 torch.nn.ReLU(),
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
 
         else:
-            print("unexpected state space",self.state_space)
+            print("unexpected state space", self.state_space)
             exit()
 
         if self.mode in self.graph_modes:
@@ -158,24 +160,23 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.node_2_name = node_2_name
 
             self.gcn = GCN(adjacency,
-                       self.device,
-                       num_nodes,
-                       node_to_game,
-                       atten=self.atten,
-                       emb_size=self.emb_size,
-                       use_layers=self.use_layers)
+                           self.device,
+                           num_nodes,
+                           node_to_game,
+                           atten=self.atten,
+                           emb_size=self.emb_size,
+                           use_layers=self.use_layers)
 
             self.embeds = torch.nn.Embedding(num_nodes, self.num_frames)
             self.object_list = torch.arange(0, num_nodes)
 
         else:
 
-            
             self.embeds = torch.nn.Embedding(len(self.object_to_char), self.num_frames)
             self.object_list = torch.arange(0, len(self.object_to_char))
 
         self.object_list = self.object_list.to(self.device)
-        self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,n=5)
+        self.inv_block = LINEAR_INV_BLOCK(self.emb_size, self.emb_size, n=5)
 
         # pre_init_embeds = None
 
@@ -184,11 +185,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #     self.embeds.weight.data.copy_(pre_init_embeds)
         #     self.embeds.requires_grad = True
 
-        trainable_parameters = sum(
-            p.numel() for p in self.parameters() if p.requires_grad)
+        trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
-    def preprocess_state(self,state, extract_goal=True,extract_inv=True):
+    def preprocess_state(self, state, extract_goal=True, extract_inv=True):
         inventory = None
         equipped = None
         goals = None
@@ -202,12 +202,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         if extract_inv:
             inventory = state[:, :, :, 0].clone().squeeze(1).detach().long()
             state = state[:, :, :, 1:].long()
-            equipped = state[:,:,4,4].clone().detach().long()
-            inventory = torch.cat((equipped,inventory),1)
+            equipped = state[:, :, 4, 4].clone().detach().long()
+            inventory = torch.cat((equipped, inventory), 1)
 
-        return state,goals,inventory,equipped
+        return state, goals, inventory, equipped
 
-    def get_embeddings(self,goals):
+    def get_embeddings(self, goals):
 
         node_embeds = None
         goal_embeddings = None
@@ -218,17 +218,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             node_embeds = self.gcn.gcn_embed(embeds)
 
             if not goals is None:
-                goal_embeddings = node_embeds[[
-                     g.item() for g in goals
-                ]]
+                goal_embeddings = node_embeds[[g.item() for g in goals]]
 
         elif self.mode == "cnn":
             node_embeds = self.embeds(self.object_list)  #Used for inventory
 
             if not goals is None:
                 goal_embeddings = self.embeds(goals)
-
-
 
         elif self.mode == "embed_bl":
             node_embeds = self.embeds(self.object_list)
@@ -252,23 +248,28 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         if self.mode != "cnn":
             #if self.mode == "embed_bl":
             state_flat = state.reshape(-1)
-            embedded_state = torch.index_select(node_embeds,0,state_flat).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
+            embedded_state = torch.index_select(node_embeds, 0,
+                                                state_flat).reshape(state.shape[0],
+                                                                    state.shape[2],
+                                                                    state.shape[3],
+                                                                    -1).permute(0, 3, 1, 2)
             state = embedded_state
 
-        else: state = state.float()
-      
+        else:
+            state = state.float()
+
         out = self.body(state)
         cnn_output = out.reshape(out.size(0), -1)
 
         if self.extract_inv:
-            inv_encoded = self.inv_block(inventory,node_embeds,goal_embeddings)
+            inv_encoded = self.inv_block(inventory, node_embeds, goal_embeddings)
             cnn_output = torch.cat((cnn_output, inv_encoded), -1)
 
         if self.extract_goal:
             # if self.mode not in ["skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"]:
-         #        goal_embeddings = F.relu(goal_embeddings)
+            #        goal_embeddings = F.relu(goal_embeddings)
             cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
-      
+
         q_value = self.head(cnn_output)
 
         return q_value
@@ -295,7 +296,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
 class DQN_agent:
     """Docstring for DQN agent """
-
     def __init__(self,
                  device,
                  state_space,
@@ -376,8 +376,7 @@ class DQN_agent:
     def loss_func(self, minibatch, writer=None, writer_step=None):
         # Make tensors
         state_tensor = torch.Tensor(np.array(minibatch.state)).to(self.device)
-        next_state_tensor = torch.Tensor(np.array(minibatch.next_state)).to(
-            self.device)
+        next_state_tensor = torch.Tensor(np.array(minibatch.next_state)).to(self.device)
 
         action_tensor = torch.Tensor(minibatch.action).to(self.device)
         reward_tensor = torch.Tensor(minibatch.reward).to(self.device)
@@ -388,27 +387,20 @@ class DQN_agent:
             dim=1, index=action_tensor.long().unsqueeze(1)).squeeze(1)
         with torch.no_grad():
             if self.double_DQN:
-                selected_actions = self.online.argmax_over_actions(
-                    next_state_tensor)
+                selected_actions = self.online.argmax_over_actions(next_state_tensor)
                 q_target = self.target(next_state_tensor).gather(
-                    dim=1,
-                    index=selected_actions.long().unsqueeze(1)).squeeze(1)
+                    dim=1, index=selected_actions.long().unsqueeze(1)).squeeze(1)
             else:
-                q_target = self.target.max_over_actions(
-                    next_state_tensor.detach()).values
+                q_target = self.target.max_over_actions(next_state_tensor.detach()).values
 
-        q_label_batch = reward_tensor + (self.gamma) * (1 -
-                                                        done_tensor) * q_target
+        q_label_batch = reward_tensor + (self.gamma) * (1 - done_tensor) * q_target
         q_label_batch = q_label_batch.detach()
 
         # Logging
         if writer:
-            writer.add_scalar('training/batch_q_label', q_label_batch.mean(),
-                              writer_step)
-            writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(),
-                              writer_step)
-            writer.add_scalar('training/batch_reward', reward_tensor.mean(),
-                              writer_step)
+            writer.add_scalar('training/batch_q_label', q_label_batch.mean(), writer_step)
+            writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
+            writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
         return torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
 
     def sync_networks(self):
@@ -419,13 +411,9 @@ class DQN_agent:
             self.online.epsilon = 1
             self.target.epsilon = 1
         else:
-            self.online.epsilon = max(
-                self.epsilon_decay_end,
-                1 - (global_steps - self.warmup_period) / self.epsilon_decay)
-            self.target.epsilon = max(
-                self.epsilon_decay_end,
-                1 - (global_steps - self.warmup_period) / self.epsilon_decay)
+            self.online.epsilon = max(self.epsilon_decay_end,
+                                      1 - (global_steps - self.warmup_period) / self.epsilon_decay)
+            self.target.epsilon = max(self.epsilon_decay_end,
+                                      1 - (global_steps - self.warmup_period) / self.epsilon_decay)
         if writer:
-            writer.add_scalar('training/epsilon', self.online.epsilon,
-
-                              global_steps)
+            writer.add_scalar('training/epsilon', self.online.epsilon, global_steps)

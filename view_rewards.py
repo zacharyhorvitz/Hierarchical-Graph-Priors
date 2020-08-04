@@ -7,29 +7,29 @@ from pandas import DataFrame
 file_names = []
 plots = []
 for file_name in glob.glob("npy_outputs/*"):
-	steps = []
-	rewards = []
-	# if not "sky" in file_name: continue
-	# if not ("simple" in file_name or "skyline" in file_name): continue
-	file_names.append(file_name)
+    steps = []
+    rewards = []
+    # if not "sky" in file_name: continue
+    # if not ("simple" in file_name or "skyline" in file_name): continue
+    file_names.append(file_name)
 
-# <<<<<<< HEAD
+    # <<<<<<< HEAD
 
-	with open(file_name, "r") as open_file:
-	    lines = list(open_file.readlines())
-	    for i, l in enumerate(lines):
-	        if "reward" in l:
-	            step = int(lines[i + 1].split()[3].replace(",", ""))
-	            reward = float(l.split()[3])
-	            steps.append(step)
-	            rewards.append(reward)
+    with open(file_name, "r") as open_file:
+        lines = list(open_file.readlines())
+        for i, l in enumerate(lines):
+            if "reward" in l:
+                step = int(lines[i + 1].split()[3].replace(",", ""))
+                reward = float(l.split()[3])
+                steps.append(step)
+                rewards.append(reward)
 
-	w = 50
+    w = 50
 
-	plots.append(plt.plot(steps[:1000], DataFrame(rewards[:1000]).rolling(w).mean().shift(1-w))[0])
+    plots.append(
+        plt.plot(steps[:1000], DataFrame(rewards[:1000]).rolling(w).mean().shift(1 - w))[0])
 
-
-plt.legend(plots,file_names)
+plt.legend(plots, file_names)
 # =======
 # with open("log.txt", "r") as open_file:
 #     lines = list(open_file.readlines())
