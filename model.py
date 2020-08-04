@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, GOAL_ATTEN_INV_BLOCK, NodeAtten, embed_state2D, self_attention, malmo_build_gcn_param
+from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, NodeAtten, self_attention, malmo_build_gcn_param
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience',
@@ -76,6 +76,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
     
     def build_env_info(self):
+
         object_to_char = {
         "air": 0,
         "wall": 1,
@@ -101,8 +102,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
     def build_model(self):
 
         self.build_env_info() #define env mapping
-
-        self.embeds = torch.nn.Embedding(20, self.num_frames)
 
         # if self.mode == 'skyline_hier_dw_noGCN_dynamic':
         #     self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"), dtype=torch.float, requires_grad=True).to(self.device)
@@ -137,7 +136,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.extract_goal,self.extract_inv = False,False
 
             self.body = torch.nn.Sequential(*[
-            torch.nn.Conv2d(self.num_frames, 8, kernel_size=(2, 2), stride=1), #8
+            torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 8, kernel_size=(2, 2), stride=1), #8
             torch.nn.ReLU()
             ])
 
@@ -149,14 +148,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             ])
 
         else:
-        	print("unexpected state space",self.state_space)
-        	exit()
+            print("unexpected state space",self.state_space)
+            exit()
 
         if self.mode in self.graph_modes:
             num_nodes,node_2_name,node_to_game,adjacency = malmo_build_gcn_param(self.object_to_char,self.mode, self.hier, self.use_layers, self.reverse_direction,self.multi_edge)
-
-            self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,node_to_game,n=5)
-
 
             self.node_2_game_char = node_to_game
             self.node_2_name = node_2_name
@@ -167,13 +163,26 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                        node_to_game,
                        atten=self.atten,
                        emb_size=self.emb_size,
-                       pre_init_embeds=None, #node_glove_embed,
                        use_layers=self.use_layers)
 
+            self.embeds = torch.nn.Embedding(num_nodes, self.num_frames)
+            self.object_list = torch.arange(0, num_nodes)
+
         else:
-            self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,self.object_to_char,n=5)
 
+            
+            self.embeds = torch.nn.Embedding(len(self.object_to_char), self.num_frames)
+            self.object_list = torch.arange(0, len(self.object_to_char))
 
+        self.object_list = self.object_list.to(self.device)
+        self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,n=5)
+
+        # pre_init_embeds = None
+
+        # if pre_init_embeds is not None:
+        #     print("using preinit embeds!")
+        #     self.embeds.weight.data.copy_(pre_init_embeds)
+        #     self.embeds.requires_grad = True
 
         trainable_parameters = sum(
             p.numel() for p in self.parameters() if p.requires_grad)
@@ -205,22 +214,24 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         if self.mode in self.graph_modes:
 
-            node_embeds = self.gcn.gcn_embed()
+            embeds = self.embeds(self.object_list)
+            node_embeds = self.gcn.gcn_embed(embeds)
 
             if not goals is None:
-	            goal_embeddings = node_embeds[[
-	                 self.gcn.game_char_to_node[g.item()] for g in goals
-	            ]]
+                goal_embeddings = node_embeds[[
+                     g.item() for g in goals
+                ]]
 
         elif self.mode == "cnn":
-            goal_embeddings = self.embeds(goals)
+            node_embeds = self.embeds(self.object_list)  #Used for inventory
 
             if not goals is None:
-                node_embeds = self.embeds(torch.arange(15).to(self.device))  #Used for inventory
+                goal_embeddings = self.embeds(goals)
+
 
 
         elif self.mode == "embed_bl":
-            node_embeds = self.embeds(torch.arange(15).to(self.device)) 
+            node_embeds = self.embeds(self.object_list)
 
             if not goals is None:
                 goal_embeddings = self.embeds(goals)
@@ -239,11 +250,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         node_embeds, goal_embeddings = self.get_embeddings(goals)
 
         if self.mode != "cnn":
-            embedded_state = self.embeds(state.reshape(state.shape[0],-1)).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
-            if self.mode == "embed_bl":
-                state = embedded_state
-            else:
-                state = embed_state2D(state,embedded_state, node_embeds, self.gcn.node_to_game_char)
+            #if self.mode == "embed_bl":
+            state_flat = state.reshape(-1)
+            embedded_state = torch.index_select(node_embeds,0,state_flat).reshape(state.shape[0],state.shape[2],state.shape[3],-1).permute(0,3,1,2)
+            state = embedded_state
+
         else: state = state.float()
       
         out = self.body(state)
