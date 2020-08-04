@@ -158,8 +158,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         return dist
 
     def get_pairwise_loss(self):
-        return self.pairwise_loss(self.embed_pairs(),self.get_true_dist())
-        
+        return self.pairwise_loss(self.embed_pairs(),self.get_true_dist())        
 
     def build_gcn(self, mode, hier, use_layers, reverse_direction):
 
@@ -229,7 +228,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             edges = [skyline_edges, hier_edges]
             use_graph = True
 
-        elif mode in ["skyline_hier","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic", "skyline_hier_atten", "fully_connected"]:
+        elif mode in ["skyline_hier","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic",
+                "skyline_hier_atten", "fully_connected", "skyline_hier_noGCN"]:
             latent_nodes = ["edge_tool", "tool", "material", "product"]
             edges = [[("pickaxe_item", "stone"), ("axe_item", "log"),
                       ("hoe_item", "dirt"), ("bucket_item", "water"),
@@ -408,7 +408,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "skyline", "skyline_hier", "skyline_atten", "skyline_hier_atten",
             "skyline_simple", "skyline_simple_atten", "skyline_simple_trash",
             "ling_prior", "fully_connected", "skyline_hier_multi",
-            "skyline_hier_multi_atten","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"
+            "skyline_hier_multi_atten","skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic",
+            "skyline_hier_noGCN"
         }
 
         if self.mode in graph_modes:
@@ -541,6 +542,7 @@ class DQN_agent:
         self.contrastive_loss_coeff = contrastive_loss_coeff
         self.positive_margin = positive_margin
         self.negative_margin = negative_margin
+        self.mode = mode
 
         if model_type == "cnn":
             assert num_frames
@@ -635,7 +637,17 @@ class DQN_agent:
                               writer_step)
         rl_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
 
-        node_embeds = self.online.gcn.gcn_embed()
+        if self.mode == 'skyline_hier':
+            node_embeds = self.online.embeds
+            if writer_step % 200 == 0:
+                print(node_embeds)
+        elif self.mode == 'embed_bl':
+            with torch.no_grad():
+                node_embeds = self.online.embeds
+                print(node_embeds)
+        else:
+            raise ValueError
+
         adjacency = self.online.adjacency[0] # NOTE does not support multiple edge types
         edges = self.online.edges[0] # NOTE does not support multiple edge types
         latent_nodes = self.online.latent_nodes
@@ -651,6 +663,7 @@ class DQN_agent:
         # print("RL Loss: {:.2f}, Contrastive Loss: {:.2f}".format(rl_loss.item(),
         #    contrastive_loss.item()))
         loss = rl_loss + self.contrastive_loss_coeff * contrastive_loss
+        print( contrastive_loss)
         return loss
 
     def sync_networks(self):

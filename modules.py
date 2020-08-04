@@ -104,7 +104,7 @@ def contrastive_loss_func(device,
 
     loss = torch.tensor([0], dtype=torch.float32, device=device)
     dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
-
+    
     for node1 in range(len(adjacency)):
         for node2 in range(len(adjacency)):
             if node1 == node2:
