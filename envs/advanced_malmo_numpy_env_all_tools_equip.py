@@ -249,7 +249,7 @@ class MalmoEnvSpecial(gym.Env):
             "movenorth", "movesouth", "movewest", "moveeast","attack 1", "use 1","equip pickaxe","equip axe","equip hoe","equip bucket"
         ]
         self.action_space = Discrete(len(self.actions))
-        self.observation_space = (9,10)
+        self.observation_space = (9,9)
 
         self.mission_types = [
             "pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"

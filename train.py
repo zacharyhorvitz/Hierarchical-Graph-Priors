@@ -25,7 +25,7 @@ from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as Env
 
 from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
 from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
-from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
+# from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
 from vis_distance_methods import load_embed_from_torch,visualize_similarity
 
 args = parse_args()
@@ -34,10 +34,11 @@ if torch.cuda.is_available():
     torch.backends.cuda.deterministic = True
     torch.backends.cuda.benchmark = False
 
-if 'npy_easy' in args.env:
-    from model_easy import DQN_agent, Experience
-else:
-    from model import DQN_agent, Experience
+# if 'npy_easy' in args.env:
+#     from model_easy import DQN_agent, Experience
+# else:
+
+from model import DQN_agent, Experience
 # Setting random seed
 torch.manual_seed(args.seed)
 random.seed(args.seed)
@@ -118,7 +119,7 @@ else:
 # Initialize model
 agent_args = {
     "device": device,
-    "state_space": (env.observation_space[0],env.observation_space[1]-1),
+    "state_space": (env.observation_space[0],env.observation_space[1]),
     "action_space": env.action_space,
     "num_actions": num_actions,
     "target_moving_average": args.target_moving_average,
@@ -129,7 +130,7 @@ agent_args = {
     "warmup_period": args.warmup_period,
     "double_DQN": not (args.vanilla_DQN),
     "model_type": args.model_type,
-    "num_frames": args.emb_size if args.mode != 'cnn' else 1,
+    "num_frames": args.emb_size,
     "mode": args.mode,
     "hier": args.use_hier,
     "atten": args.atten,
@@ -206,7 +207,7 @@ if args.load_checkpoint_path and checkpoint is not None:
 
 while global_steps < args.max_steps:
     print(
-        f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start)}"
+        f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start+0.001)}"
     )
     start = time.time()
     state = env.reset()
