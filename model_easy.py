@@ -70,12 +70,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                                                self.use_layers,
                                                self.reverse_direction)
         if self.mode == 'skyline_hier_dw_noGCN_dynamic':
-            exit()
+            raise NotImplementedError
             self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"),
                                                     dtype=torch.float,
                                                     requires_grad=True).to(self.device)
         elif self.mode == 'skyline_hier_dw_noGCN':  #default title is static deepwalk embeddings
-            exit()
+            raise NotImplementedError
             self.node_embeds_from_dw = torch.FloatTensor(
                 np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
 #        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
@@ -174,8 +174,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #    print("{} incompatible mode with hier".format(mode))
         #    exit()
         if not hier and mode == "ling_prior":
-            print("{} requires hier".format(mode))
-            exit()
+            raise ValueError("{} requires hier".format(mode))
 
         #name_2_node = {e:i for i,e in enumerate(["stone","pickaxe","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"])}
         #game_nodes = ["stone","pickaxe","cobblestone","log","axe","dirt","farmland","hoe","water","bucket","water_bucket"]
@@ -366,8 +365,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 elif mode in ["skyline_simple", "skyline_simple_atten"]:
                     glove_dict = glove_dict["skyline_simple"]
                 else:
-                    print("Invalid config use of use_glove")
-                    exit()
+                    raise ValueError("Invalid config use of use_glove")
 
             node_glove_embed = []
             for node in sorted(game_nodes + latent_nodes, key=lambda x: name_2_node[x]):
@@ -456,8 +454,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             #     self.gcn.game_char_to_node[g.item()] for g in goals
             # ]]
         else:
-            print("Invalid mode")
-            sys.exit()
+            raise ValueError("Invalid mode")
+
         if self.mode != "cnn":
             embedded_state = self.embeds(state.reshape(state.shape[0],
                                                        -1)).reshape(state.shape[0],

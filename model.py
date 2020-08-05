@@ -150,8 +150,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             ])
 
         else:
-            print("unexpected state space", self.state_space)
-            exit()
+            raise ValueError("Unexpected state space {}".format(self.state_space))
 
         if self.mode in self.graph_modes:
             num_nodes,node_2_name,node_to_game,adjacency = malmo_build_gcn_param(self.object_to_char,self.mode, self.hier, self.use_layers, self.reverse_direction,self.multi_edge)
@@ -233,8 +232,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 goal_embeddings = self.embeds(goals)
 
         else:
-            print("Invalid mode")
-            sys.exit()
+            raise ValueError("Invalid mode")
 
         return node_embeds, goal_embeddings
 
