@@ -18,6 +18,7 @@ Experience = namedtuple('Experience',
 class DQN_MALMO_CNN_model(torch.nn.Module):
     """Docstring for DQN CNN model """
 
+
     def __init__(
         self,
         device,
@@ -33,9 +34,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         one_layer=False,
         emb_size=16,
         multi_edge=False,
-        use_glove=False,
+        aux_dist_loss=0,
         self_attention=False,
         reverse_direction=False,
+        converged_init=None,
+        dist_path=None,
         use_layers=3):
         """Defining DQN CNN model
         """
@@ -43,6 +46,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         super(DQN_MALMO_CNN_model, self).__init__()
         print("using MALMO CNN {} {} {}".format(num_frames, final_dense_layer,
                                                 state_space))
+        self.converged_init=converged_init
+        self.dist_path=dist_path
         self.state_space = state_space
         self.action_space = action_space
         self.device = device
@@ -58,7 +63,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.hier = hier
         self.emb_size = emb_size
         self.multi_edge = multi_edge
-        self.use_glove = use_glove
+        self.aux_dist_loss = aux_dist_loss
         self.self_attention = self_attention
         self.reverse_direction = reverse_direction
         self.use_layers = use_layers
@@ -177,6 +182,44 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.object_list = self.object_list.to(self.device)
         self.inv_block = LINEAR_INV_BLOCK(self.emb_size,self.emb_size,n=5)
 
+        if self.aux_dist_loss != 0:
+            assert self.dist_path is not None
+            print("Loading distances from...",self.dist_path)
+            sim_matrix = np.load(self.dist_path+"/good_avg_matrix.npy")
+            sim_keys = np.load(self.dist_path+"/good_avg_keys.npy")
+            sim_keys = np.where(sim_keys=="player","wall",sim_keys)
+            self.goal_dist= torch.zeros(len(self.embeds.weight),len(self.embeds.weight))
+            print(sim_matrix.shape)
+            print(self.goal_dist.shape)
+            for x in range(sim_matrix.shape[0]):
+              for y in range(sim_matrix.shape[1]):
+                   first_node = self.object_to_char[sim_keys[x]]
+                   second_node = self.object_to_char[sim_keys[y]]
+                   self.goal_dist[first_node][second_node] = sim_matrix[x][y]
+            #self.goal_dist += (0.1**0.5)*torch.randn(self.goal_dist.shape)
+            self.goal_dist.cuda() # to(self.device)
+            self.build_pairs()
+            self.pairwise = torch.nn.PairwiseDistance(p=2)
+            self.pairwise_loss = torch.nn.MSELoss()
+ 
+        if self.converged_init is not None:
+          print("Loading converged embeddings")
+          checkpoint = torch.load(self.converged_init) #'saved_models_zach/easyNpyMini_embedbl_8_4task/checkpoint_mini_embed_bl_8_4task_1.tar')
+          if self.embeds.weight.shape != checkpoint["model_state_dict"]['embeds.weight'].shape:
+              print("WARNING: Embeddings matrices do not match...copying over")
+              print(self.embeds.weight.shape,checkpoint["model_state_dict"]['embeds.weight'].shape)
+
+              embed_copy = self.embeds.weight.detach().data
+              for i,(e1,e2) in enumerate(zip(checkpoint["model_state_dict"]['embeds.weight'],embed_copy)):
+                  embed_copy[i] = e1
+
+              self.embeds.weight = torch.nn.Parameter(embed_copy)
+
+          else:
+              self.embeds.weight = torch.nn.Parameter(checkpoint["model_state_dict"]['embeds.weight'])
+          self.embeds.weight.requires_grad = True
+
+
         # pre_init_embeds = None
 
         # if pre_init_embeds is not None:
@@ -187,6 +230,41 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         trainable_parameters = sum(
             p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
+
+    def build_pairs(self,exclude={0,1}):
+
+        print("Excluding distances for objects:",exclude)
+
+        seen = set()
+        pairs = []
+        nodes = self.object_list
+        for n in nodes:
+           for m in nodes:
+              if n in exclude or m in exclude: continue
+              if n == m: continue
+              if str(sorted([n,m])) in seen: continue
+              seen.add(str(sorted([n,m])))
+              pairs.append([n,m])
+        self.pairs = torch.tensor([list(x) for x in pairs]).cuda() # .to(self.device)
+
+
+    def embed_pairs(self):
+        pairs = self.embeds(self.pairs)
+        dist = self.pairwise(pairs[:,0],pairs[:,1])
+        dist = dist / torch.mean(dist)
+        return dist
+
+    def get_true_dist(self):
+        #TODO: load embedding distance in model init, fix alignment with keys, matrix
+        dist = self.goal_dist[self.pairs[:,0],self.pairs[:,1]]
+        dist = dist #/ torch.mean(dist)
+        # print(dist)
+        # exit()
+        return dist
+
+    def get_pairwise_loss(self):
+        return self.pairwise_loss(self.embed_pairs(),self.get_true_dist().cuda())
+
 
     def preprocess_state(self,state, extract_goal=True,extract_inv=True):
         inventory = None
@@ -316,13 +394,17 @@ class DQN_agent:
                  one_layer=False,
                  emb_size=16,
                  multi_edge=False,
-                 use_glove=False,
+                 aux_dist_loss=0,
                  self_attention=False,
                  use_layers=3,
+                 converged_init=None,
+                 dist_path=None,
                  reverse_direction=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
+        self.embed_lambda = aux_dist_loss
+        self.mode = mode
 
         if model_type == "cnn":
             assert num_frames
@@ -336,10 +418,12 @@ class DQN_agent:
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              use_glove=use_glove,
+                                              aux_dist_loss=aux_dist_loss,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
-                                              reverse_direction=reverse_direction)
+                                              reverse_direction=reverse_direction,dist_path=dist_path,converged_init=converged_init,self_attention=self_attention,one_layer=one_layer)
+
+
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
                                               action_space,
@@ -349,10 +433,10 @@ class DQN_agent:
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              use_glove=use_glove,
+                                              aux_dist_loss=aux_dist_loss,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
-                                              reverse_direction=reverse_direction)
+                                              reverse_direction=reverse_direction,dist_path=dist_path,converged_init=converged_init,self_attention=self_attention,one_layer=one_layer)
 
         else:
             raise NotImplementedError(model_type)
@@ -409,7 +493,12 @@ class DQN_agent:
                               writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(),
                               writer_step)
-        return torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+        embed_loss = 0
+        if self.embed_lambda != 0:
+           embed_loss = self.online.get_pairwise_loss()
+           # print(embed_loss)
+        dqn_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+        return dqn_loss + self.embed_lambda * embed_loss
 
     def sync_networks(self):
         sync_networks(self.target, self.online, self.target_moving_average)

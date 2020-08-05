@@ -177,9 +177,10 @@ def parse_args():
                         help='specify single edge or multi edge',
                         action='store_true',
                         required=False)
-    parser.add_argument('--use_glove',
-                        help='specify whether nodes should be initialized to glove',
-                        action='store_true',
+    parser.add_argument('--aux_dist_loss',
+                        help='specify whether to add distance loss to dqn loss',
+                        type=int,
+                        default=0,
                         required=False)
     
     parser.add_argument('--self_attention',
@@ -206,6 +207,19 @@ def parse_args():
                         type=str,
                         default="dist_data",
                         required=False)
+
+    parser.add_argument('--converged_init',
+                        help='path to saved embeddings',
+                        type=str,
+                        default=None,
+                        required=False)
+
+    parser.add_argument('--dist_path',
+                        help='path to folder with distance matrix and keys',
+                        type=str,
+                        default=None,
+                        required=False)
+
     return parser.parse_args()
 
 

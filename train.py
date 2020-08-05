@@ -137,9 +137,11 @@ agent_args = {
     "emb_size": args.emb_size,
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
-    "use_glove": args.use_glove,
+    "aux_dist_loss": args.aux_dist_loss,
     "self_attention": args.self_attention,
     "use_layers": args.use_layers,
+    "converged_init":args.converged_init,
+    "dist_path":args.dist_path,
     "reverse_direction": args.reverse_direction
 }
 agent = DQN_agent(**agent_args)
@@ -198,8 +200,7 @@ if not os.path.exists(args.dist_save_folder):
     os.mkdir(args.dist_save_folder)
 
 if args.save_dist_freq != -1:
-  with open(args.mode+"_distance_indices.json","r") as node_name_file:
-      node_to_sim_index = {v:k for k,v in json.load(node_name_file).items()}
+      node_to_sim_index = {v:k for k,v in agent.online.object_to_char.items()}
 
 if args.load_checkpoint_path and checkpoint is not None:
     global_steps = checkpoint['global_steps']
