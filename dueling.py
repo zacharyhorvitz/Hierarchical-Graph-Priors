@@ -102,8 +102,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
     def build_gcn(self, mode, hier):
 
         if not hier and mode == "ling_prior":
-            print("{} requires hier".format(mode))
-            exit()
+            raise ValueError("{} requires hier".format(mode))
 
         object_to_char = {
             "air": 0,

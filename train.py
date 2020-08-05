@@ -222,7 +222,6 @@ while global_steps < args.max_steps:
             file_name = os.path.join(args.dist_save_folder,
                                      f"checkpoint_{run_tag}") + f"_{global_steps}"
             visualize_similarity(name_to_embeddings, file_name)
-            #exit()
         action = agent.online.act(state, agent.online.epsilon)
         next_state, reward, done, info = env.step(action)
         steps += 1

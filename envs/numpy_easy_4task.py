@@ -24,8 +24,7 @@ class MalmoEnvSpecial(gym.Env):
             elif m == "bucket_water":
                 spawn_entities += ["water","bucket_item"]
             else:
-                print("Bad mission",m)
-                exit()
+                raise ValueError("Bad mission {}".format(m))
 
         spawn_entities += [random.choice(["stone","log","water","dirt"])]
 
