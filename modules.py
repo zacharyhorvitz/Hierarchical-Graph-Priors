@@ -140,6 +140,34 @@ def embed_state(game_board, state, node_embeddings, node_2_game_char):
 #     return state.permute((0, 3, 1, 2))
 
 
+def contrastive_loss_func(device,
+                          node_embeddings,
+                          adjacency,
+                          latent_nodes,
+                          node_to_name,
+                          positive_margin,
+                          negative_margin):
+
+    loss = torch.tensor([0], dtype=torch.float32, device=device)
+    dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
+
+    for node1 in range(len(adjacency)):
+        for node2 in range(len(adjacency)):
+            if node1 == node2:
+                continue
+            if node_to_name[node1] in latent_nodes or node_to_name[node2] in latent_nodes:
+                loss += torch.max(
+                    torch.tensor([positive_margin, dist_matrix[node1][node2]],
+                                 device=device)) - positive_margin
+            else:
+                loss += torch.max(
+                    torch.tensor([0, negative_margin - dist_matrix[node1][node2]],
+                                 dtype=torch.float32,
+                                 device=device))
+
+    return loss
+
+
 def self_attention(K, V, Q):
     """
 	This functions runs a single attention head.

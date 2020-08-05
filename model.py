@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, NodeAtten, self_attention, malmo_build_gcn_param
+from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, NodeAtten, self_attention, malmo_build_gcn_param, contrastive_loss_func
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
@@ -401,7 +401,26 @@ class DQN_agent:
             writer.add_scalar('training/batch_q_label', q_label_batch.mean(), writer_step)
             writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
-        return torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+
+        rl_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+
+        node_embeds = self.online.get_embeddings(None)
+        adjacency = self.online.adjacency[0] # NOTE does not support multiple edge types
+        edges = self.online.edges[0] # NOTE does not support multiple edge types
+        latent_nodes = self.online.latent_nodes
+        conversion_dict = self.online.node_2_name
+
+        contrastive_loss = contrastive_loss_func(self.device, 
+                                                 node_embeds,
+                                                 adjacency,
+                                                 latent_nodes,
+                                                 conversion_dict,
+                                                 self.positive_margin,
+                                                 self.negative_margin)
+        print("RL Loss: {:.2f}, Contrastive Loss: {:.2f}".format(rl_loss.item(),
+           contrastive_loss.item()))
+        loss = rl_loss + self.contrastive_loss_coeff * contrastive_loss
+        return loss
 
     def sync_networks(self):
         sync_networks(self.target, self.online, self.target_moving_average)
