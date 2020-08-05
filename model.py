@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, CNN_NODE_ATTEN_BLOCK, CNN_2D_NODE_BLOCK,LINEAR_INV_BLOCK, NodeAtten, self_attention, malmo_build_gcn_param
+from modules import GCN, LINEAR_INV_BLOCK, malmo_build_gcn_param, contrastive_loss_func
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
@@ -159,10 +159,20 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             exit()
 
         if self.mode in self.graph_modes:
-            num_nodes,node_2_name,node_to_game,adjacency = malmo_build_gcn_param(self.object_to_char,self.mode, self.hier, self.use_layers, self.reverse_direction,self.multi_edge)
+            num_nodes, node_to_name, node_to_game, adjacency, edges, latent_nodes = malmo_build_gcn_param(
+                                                                            self.object_to_char,
+                                                                            self.mode,
+                                                                            self.hier,
+                                                                            self.use_layers,
+                                                                            self.reverse_direction,
+                                                                            self.multi_edge)
 
-            self.node_2_game_char = node_to_game
-            self.node_2_name = node_2_name
+            self.node_to_game_char = node_to_game
+            self.node_to_name = node_to_name
+            self.adjacency = adjacency
+            self.edges = edges
+            self.latent_nodes = latent_nodes
+
 
             self.gcn = GCN(adjacency,
                            self.device,
@@ -325,7 +335,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         #If easy, change model and dont extract goal or inv
 
-        state,goals,inventory,equipped = self.preprocess_state(state, self.extract_goal,self.extract_inv)
+        state, goals, inventory, equipped = self.preprocess_state(state,
+                self.extract_goal, self.extract_inv)
+
         node_embeds, goal_embeddings = self.get_embeddings(goals)
 
         if self.mode != "cnn":
@@ -497,12 +509,42 @@ class DQN_agent:
             writer.add_scalar('training/batch_q_label', q_label_batch.mean(), writer_step)
             writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
+
         embed_loss = 0
         if self.embed_lambda != 0:
             embed_loss = self.online.get_pairwise_loss()
-            # print(embed_loss)
-        dqn_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
-        return dqn_loss + self.embed_lambda * embed_loss
+
+        rl_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+
+        # Get the embeddings
+        node_embeds = self.online.get_embeddings(None)
+
+        # Get adjacency matrix
+        adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
+
+        # Get edge list
+        edges = self.online.edges[0]  # NOTE does not support multiple edge types
+
+        # Get conversions and list of latent nodes
+        latent_nodes = self.online.latent_nodes
+        conversion_dict = self.online.node_to_name
+
+        contrastive_loss = contrastive_loss_func(self.device,
+                                                 node_embeds,
+                                                 adjacency,
+                                                 latent_nodes,
+                                                 conversion_dict,
+                                                 self.positive_margin,
+                                                 self.negative_margin)
+
+        print("RL Loss: {:.2f}, Contrastive Loss: {:.2f}".format(rl_loss.item(),
+                                                                 contrastive_loss.item()))
+
+        loss = rl_loss
+        loss += self.contrastive_loss_coeff * contrastive_loss
+        loss += self.embed_lambda * embed_loss
+
+        return loss
 
     def sync_networks(self):
         sync_networks(self.target, self.online, self.target_moving_average)
