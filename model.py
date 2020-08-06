@@ -257,7 +257,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
     def get_true_dist(self):
         #TODO: load embedding distance in model init, fix alignment with keys, matrix
         dist = self.goal_dist[self.pairs[:,0],self.pairs[:,1]]
-        dist = dist #/ torch.mean(dist)
+        dist = dist / torch.mean(dist)
         # print(dist)
         # exit()
         return dist
