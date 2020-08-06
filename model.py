@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, LINEAR_INV_BLOCK, malmo_build_gcn_param, contrastive_loss_func
+from modules import GCN, LINEAR_INV_BLOCK, malmo_build_gcn_param
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
@@ -172,7 +172,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.edges = edges
             self.latent_nodes = latent_nodes
 
-
             self.gcn = GCN(adjacency,
                            self.device,
                            num_nodes,
@@ -272,14 +271,48 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
     def get_true_dist(self):
         #TODO: load embedding distance in model init, fix alignment with keys, matrix
 
-        dist = self.goal_dist[self.pairs[:,0],self.pairs[:,1]]
+        dist = self.goal_dist[self.pairs[:, 0], self.pairs[:, 1]]
         dist = dist / torch.mean(dist)
-
 
         return dist
 
     def get_pairwise_loss(self):
         return self.pairwise_loss(self.embed_pairs(), self.get_true_dist().cuda())
+
+    def contrastive_loss_func(self, positive_margin, negative_margin):
+
+        # NOTE: This will double count if the graph has a cycle
+
+        loss = torch.tensor([0], dtype=torch.float32)
+
+        # Get adjacency matrix
+        adjacency = self.adjacency[0]  # NOTE does not support multiple edge types
+        adjacency = adjacency.transpose(0, 1)  # NOTE adjacency is transposed, we're undoing it
+
+        # Get the embeddings
+        node_embeddings, _ = self.get_embeddings(None)
+        dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
+
+        # Get edge list
+        edges = self.edges[0]  # NOTE does not support multiple edge types
+
+        # Get conversions and list of latent nodes
+        latent_nodes = self.latent_nodes
+
+        for n1 in range(len(adjacency)):
+            for n2 in range(len(adjacency)):
+                if n1 == n2:
+                    continue
+                if self.node_to_name[n1] in latent_nodes or self.node_to_name[n2] in latent_nodes:
+                    loss += adjacency[n1][n2] * torch.max(
+                        torch.tensor([positive_margin, dist_matrix[n1][n2]
+                                     ])) - positive_margin
+                else:
+                    loss += torch.max(
+                        torch.tensor([0, negative_margin - dist_matrix[n1][n2]],
+                                     dtype=torch.float32))
+
+        return loss.item()
 
     def preprocess_state(self, state, extract_goal=True, extract_inv=True):
         inventory = None
@@ -423,7 +456,7 @@ class DQN_agent:
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.aux_dist_loss_coeff = aux_dist_loss_coeff
-        self.contrastive_loss_coeff = contrastive_loss_coeff 
+        self.contrastive_loss_coeff = contrastive_loss_coeff
         self.positive_margin = positive_margin
         self.negative_margin = negative_margin
         self.mode = mode
@@ -521,36 +554,24 @@ class DQN_agent:
             writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
 
-
         loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
-        
+
         if self.contrastive_loss_coeff != 0:
-            # Get the embeddings
-            node_embeds, _ = self.online.get_embeddings(None)
 
-            # Get adjacency matrix
-            adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
-            adjacency = adjacency.transpose(0, 1) # NOTE adjacency is transposed, we're undoing it
+            contrastive_loss = self.online.contrastive_loss_func(self.positive_margin,
+                                                                 self.negative_margin)
 
-            # Get edge list
-            edges = self.online.edges[0]  # NOTE does not support multiple edge types
+            if writer:
+                writer.add_scalar('training/contrastive_loss', contrastive_loss, writer_step)
 
-            # Get conversions and list of latent nodes
-            latent_nodes = self.online.latent_nodes
-            conversion_dict = self.online.node_to_name
-
-            contrastive_loss = contrastive_loss_func(self.device,
-                                                     node_embeds,
-                                                     adjacency,
-                                                     latent_nodes,
-                                                     conversion_dict,
-                                                     self.positive_margin,
-                                                     self.negative_margin)
-
-            loss += self.contrastive_loss_coeff * contrastive_loss.item()
+            loss += self.contrastive_loss_coeff * contrastive_loss
 
         if self.aux_dist_loss_coeff != 0:
             aux_dist_loss = self.online.get_pairwise_loss()
+
+            if writer:
+                writer.add_scalar('training/aux_dist_loss', aux_dist_loss, writer_step)
+
             loss += self.aux_dist_loss_coeff * aux_dist_loss
 
         return loss
