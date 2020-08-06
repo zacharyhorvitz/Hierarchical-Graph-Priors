@@ -33,7 +33,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         one_layer=False,
         emb_size=16,
         multi_edge=False,
-        aux_dist_loss=0,
+        aux_dist_loss_coeff=0,
         self_attention=False,
         reverse_direction=False,
         converged_init=None,
@@ -61,7 +61,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.hier = hier
         self.emb_size = emb_size
         self.multi_edge = multi_edge
-        self.aux_dist_loss = aux_dist_loss
+        self.aux_dist_loss_coeff = aux_dist_loss_coeff
         self.self_attention = self_attention
         self.reverse_direction = reverse_direction
         self.use_layers = use_layers
@@ -409,7 +409,8 @@ class DQN_agent:
                  one_layer=False,
                  emb_size=16,
                  multi_edge=False,
-                 aux_dist_loss=0,
+                 aux_dist_loss_coeff=0,
+                 contrastive_loss_coeff=0,
                  self_attention=False,
                  use_layers=3,
                  converged_init=None,
@@ -418,7 +419,7 @@ class DQN_agent:
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
-        self.embed_lambda = aux_dist_loss
+        self.aux_dist_loss_coeff = aux_dist_loss_coeff
         self.mode = mode
 
         if model_type == "cnn":
@@ -433,7 +434,7 @@ class DQN_agent:
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              aux_dist_loss=aux_dist_loss,
+                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
                                               reverse_direction=reverse_direction,
@@ -451,7 +452,7 @@ class DQN_agent:
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              aux_dist_loss=aux_dist_loss,
+                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
                                               reverse_direction=reverse_direction,
@@ -478,6 +479,12 @@ class DQN_agent:
 
         self.model_type = model_type
         self.double_DQN = double_DQN
+
+        if aux_dist_loss_coeff != 0:
+            print("Using aux_dist_loss")
+
+        if contrastive_loss_coeff != 0:
+            print("Using contrastive_loss")
 
     def loss_func(self, minibatch, writer=None, writer_step=None):
         # Make tensors
@@ -508,39 +515,36 @@ class DQN_agent:
             writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
 
-        embed_loss = 0
-        if self.embed_lambda != 0:
-            embed_loss = self.online.get_pairwise_loss()
 
-        rl_loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+        loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
+        
+        if self.contrastive_loss_coeff != 0:
+            # Get the embeddings
+            node_embeds = self.online.get_embeddings(None)
 
-        # Get the embeddings
-        node_embeds = self.online.get_embeddings(None)
+            # Get adjacency matrix
+            adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
 
-        # Get adjacency matrix
-        adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
+            # Get edge list
+            edges = self.online.edges[0]  # NOTE does not support multiple edge types
 
-        # Get edge list
-        edges = self.online.edges[0]  # NOTE does not support multiple edge types
+            # Get conversions and list of latent nodes
+            latent_nodes = self.online.latent_nodes
+            conversion_dict = self.online.node_to_name
 
-        # Get conversions and list of latent nodes
-        latent_nodes = self.online.latent_nodes
-        conversion_dict = self.online.node_to_name
+            contrastive_loss = contrastive_loss_func(self.device,
+                                                     node_embeds,
+                                                     adjacency,
+                                                     latent_nodes,
+                                                     conversion_dict,
+                                                     self.positive_margin,
+                                                     self.negative_margin)
 
-        contrastive_loss = contrastive_loss_func(self.device,
-                                                 node_embeds,
-                                                 adjacency,
-                                                 latent_nodes,
-                                                 conversion_dict,
-                                                 self.positive_margin,
-                                                 self.negative_margin)
+            loss += self.contrastive_loss_coeff * contrastive_loss
 
-        print("RL Loss: {:.2f}, Contrastive Loss: {:.2f}".format(rl_loss.item(),
-                                                                 contrastive_loss.item()))
-
-        loss = rl_loss
-        loss += self.contrastive_loss_coeff * contrastive_loss
-        loss += self.embed_lambda * embed_loss
+        if self.aux_dist_loss_coeff != 0:
+            aux_dist_loss = self.online.get_pairwise_loss()
+            loss += self.aux_dist_loss_coeff * aux_dist_loss
 
         return loss
 
