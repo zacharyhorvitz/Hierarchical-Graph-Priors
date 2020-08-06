@@ -192,7 +192,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.object_list = self.object_list.to(self.device)
         self.inv_block = LINEAR_INV_BLOCK(self.emb_size, self.emb_size, n=5)
 
-        if self.aux_dist_loss != 0:
+        if self.aux_dist_loss_coeff != 0:
             assert self.dist_path is not None
             print("Loading distances from...", self.dist_path)
             sim_matrix = np.load(self.dist_path + "/good_avg_matrix.npy")
@@ -346,7 +346,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                                                                     state.shape[2],
                                                                     state.shape[3],
                                                                     -1).permute(0, 3, 1, 2)
-            state = embedded_state
+            state = embedded_state.contiguous()
 
         else:
             state = state.float()
@@ -401,6 +401,10 @@ class DQN_agent:
                  epsilon_decay_end,
                  warmup_period,
                  double_DQN,
+                 aux_dist_loss_coeff,
+                 contrastive_loss_coeff,
+                 positive_margin,
+                 negative_margin,
                  model_type="mlp",
                  num_frames=None,
                  mode="skyline",
@@ -409,8 +413,6 @@ class DQN_agent:
                  one_layer=False,
                  emb_size=16,
                  multi_edge=False,
-                 aux_dist_loss_coeff=0,
-                 contrastive_loss_coeff=0,
                  self_attention=False,
                  use_layers=3,
                  converged_init=None,
@@ -420,6 +422,9 @@ class DQN_agent:
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.aux_dist_loss_coeff = aux_dist_loss_coeff
+        self.contrastive_loss_coeff = contrastive_loss_coeff 
+        self.positive_margin = positive_margin
+        self.negative_margin = negative_margin
         self.mode = mode
 
         if model_type == "cnn":
@@ -520,11 +525,11 @@ class DQN_agent:
         
         if self.contrastive_loss_coeff != 0:
             # Get the embeddings
-            node_embeds = self.online.get_embeddings(None)
+            node_embeds, _ = self.online.get_embeddings(None)
 
             # Get adjacency matrix
             adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
-            adjacency = adjacency.transpose() # NOTE adjacency is transposed, we're undoing it
+            adjacency = adjacency.transpose(0, 1) # NOTE adjacency is transposed, we're undoing it
 
             # Get edge list
             edges = self.online.edges[0]  # NOTE does not support multiple edge types
@@ -541,7 +546,7 @@ class DQN_agent:
                                                      self.positive_margin,
                                                      self.negative_margin)
 
-            loss += self.contrastive_loss_coeff * contrastive_loss
+            loss += self.contrastive_loss_coeff * contrastive_loss.item()
 
         if self.aux_dist_loss_coeff != 0:
             aux_dist_loss = self.online.get_pairwise_loss()

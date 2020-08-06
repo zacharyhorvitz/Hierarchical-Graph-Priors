@@ -137,6 +137,8 @@ agent_args = {
     "multi_edge": args.multi_edge,
     "aux_dist_loss_coeff": args.aux_dist_loss_coeff,
     "contrastive_loss_coeff": args.contrastive_loss_coeff,
+    "positive_margin": args.positive_margin,
+    "negative_margin": args.negative_margin,
     "self_attention": args.self_attention,
     "use_layers": args.use_layers,
     "converged_init": args.converged_init,

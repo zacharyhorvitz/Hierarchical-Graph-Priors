@@ -152,12 +152,26 @@ def parse_args():
                         help='specify single edge or multi edge',
                         action='store_true',
                         required=False)
-    parser.add_argument('--aux_dist_loss',
+    parser.add_argument('--aux_dist_loss_coeff',
                         help='specify whether to add distance loss to dqn loss',
-                        type=int,
+                        type=float,
                         default=0,
                         required=False)
-
+    parser.add_argument('--contrastive-loss-coeff',
+                        help='Contrastive loss coefficient',
+                        type=float,
+                        default=0,
+                        required=False)
+    parser.add_argument('--negative-margin',
+                        help='Negative margin for contrastive_loss',
+                        type=float,
+                        default=6.5,
+                        required=False)
+    parser.add_argument('--positive-margin',
+                        help='Positive margin for contrastive_loss',
+                        type=float,
+                        default=2.5,
+                        required=False)
     parser.add_argument('--self_attention',
                         help='specify whether self attention applied to node embeddings',
                         action='store_true',
