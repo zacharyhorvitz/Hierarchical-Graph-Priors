@@ -72,9 +72,9 @@ class GCN(torch.nn.Module):
             layer_out = []
             for e in range(self.num_edges):
                 if self.atten:
-                    weighting = F.normalize(self.attention[e] * self.A[e])
+                    weighting = F.normalize(self.attention[e] * self.A[e].float())
                 else:
-                    weighting = F.normalize(self.A[e])
+                    weighting = F.normalize(self.A[e].float())
                 layer_out.append(torch.mm(weighting, x))  #)
             x = torch.cat([
                 relu(self.weights[e][l](type_features)) for e,
@@ -315,16 +315,16 @@ def malmo_build_gcn_param(object_to_char, mode, hier, use_layers, reverse_direct
     print("Latent Nodes:", latent_nodes)
     print("Edges:", edges)
 
-    adjacency = torch.FloatTensor(torch.zeros(len(edges), num_nodes, num_nodes))
+    adjacency = torch.zeros(len(edges), num_nodes, num_nodes, dtype=torch.uint8)
     for edge_type in range(len(edges)):
         for i in range(num_nodes):
-            adjacency[edge_type][i][i] = 1.0
+            adjacency[edge_type][i][i] = 1
         for s, d in edges[edge_type]:
-            adjacency[edge_type][name_to_node[d]][name_to_node[s]] = 1.0  #corrected transpose!!!!
+            adjacency[edge_type][name_to_node[d]][name_to_node[s]] = 1  #corrected transpose!!!!
     if reverse_direction:
         adjacency = torch.transpose(adjacency, 1, 2)
     if mode == "fully_connected":
-        adjacency = torch.FloatTensor(torch.ones(1, num_nodes, num_nodes))
+        adjacency = torch.ones(1, num_nodes, num_nodes, dtype=torch.uint8)
 
     #if self.use_glove:
     # import json

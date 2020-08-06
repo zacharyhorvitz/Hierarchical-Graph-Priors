@@ -24,6 +24,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         state_space,
         action_space,
         num_actions,
+        aux_dist_loss_coeff,
+        contrastive_loss_coeff,
+        positive_margin,
+        negative_margin,
         num_frames=1,
         final_dense_layer=50,
         #input_shape=(9, 9),
@@ -33,7 +37,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         one_layer=False,
         emb_size=16,
         multi_edge=False,
-        aux_dist_loss_coeff=0,
         self_attention=False,
         reverse_direction=False,
         converged_init=None,
@@ -62,6 +65,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.emb_size = emb_size
         self.multi_edge = multi_edge
         self.aux_dist_loss_coeff = aux_dist_loss_coeff
+        self.contrastive_loss_coeff = contrastive_loss_coeff
+        self.positive_margin = positive_margin
+        self.negative_margin = negative_margin
         self.self_attention = self_attention
         self.reverse_direction = reverse_direction
         self.use_layers = use_layers
@@ -168,9 +174,24 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
             self.node_to_game_char = node_to_game
             self.node_to_name = node_to_name
+            self.name_to_node = {v: k for k, v in self.node_to_name.items()}
             self.adjacency = adjacency
+
             self.edges = edges
             self.latent_nodes = latent_nodes
+            self.latent_node_idx = [self.name_to_node[l] for l in self.latent_nodes]
+
+            if self.contrastive_loss_coeff != 0:
+                # NOTE does not support multiple edge types
+                # NOTE adjacency is transposed, we're undoing it
+                self.untransposed_adjacency = adjacency[0].transpose(0, 1).to(self.device)
+                self.contrastive_mask = torch.zeros_like(self.untransposed_adjacency,
+                                                         dtype=torch.uint8)
+                self.contrastive_mask[self.latent_node_idx, :] = 1
+                self.contrastive_mask[:, self.latent_node_idx] = 1
+                self.contrastive_mask *= self.untransposed_adjacency
+                self.positive_margin = torch.as_tensor(self.positive_margin, device=self.device)
+                self.negative_margin = torch.as_tensor(self.negative_margin, device=self.device)
 
             self.gcn = GCN(adjacency,
                            self.device,
@@ -283,36 +304,16 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         # NOTE: This will double count if the graph has a cycle
 
-        loss = torch.tensor([0], dtype=torch.float32)
-
-        # Get adjacency matrix
-        adjacency = self.adjacency[0]  # NOTE does not support multiple edge types
-        adjacency = adjacency.transpose(0, 1)  # NOTE adjacency is transposed, we're undoing it
-
-        # Get the embeddings
         node_embeddings, _ = self.get_embeddings(None)
         dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
+        pos_loss = self.untransposed_adjacency * torch.max(self.positive_margin,
+                                                           dist_matrix - self.positive_margin)
+        neg_loss = torch.max(torch.as_tensor(0, dtype=torch.float32, device=self.device),
+                             self.negative_margin - dist_matrix)
 
-        # Get edge list
-        edges = self.edges[0]  # NOTE does not support multiple edge types
+        loss = torch.where(self.contrastive_mask, pos_loss, neg_loss)
 
-        # Get conversions and list of latent nodes
-        latent_nodes = self.latent_nodes
-
-        for n1 in range(len(adjacency)):
-            for n2 in range(len(adjacency)):
-                if n1 == n2:
-                    continue
-                if self.node_to_name[n1] in latent_nodes or self.node_to_name[n2] in latent_nodes:
-                    loss += adjacency[n1][n2] * torch.max(
-                        torch.tensor([positive_margin, dist_matrix[n1][n2]
-                                     ])) - positive_margin
-                else:
-                    loss += torch.max(
-                        torch.tensor([0, negative_margin - dist_matrix[n1][n2]],
-                                     dtype=torch.float32))
-
-        return loss.item()
+        return loss.sum()
 
     def preprocess_state(self, state, extract_goal=True, extract_inv=True):
         inventory = None
@@ -468,12 +469,15 @@ class DQN_agent:
                                               state_space,
                                               action_space,
                                               num_actions,
+                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
+                                              contrastive_loss_coeff=contrastive_loss_coeff,
+                                              negative_margin=negative_margin,
+                                              positive_margin=positive_margin,
                                               num_frames=num_frames,
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
                                               reverse_direction=reverse_direction,
@@ -486,12 +490,15 @@ class DQN_agent:
                                               state_space,
                                               action_space,
                                               num_actions,
+                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
+                                              contrastive_loss_coeff=contrastive_loss_coeff,
+                                              negative_margin=negative_margin,
+                                              positive_margin=positive_margin,
                                               num_frames=num_frames,
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
                                               reverse_direction=reverse_direction,
