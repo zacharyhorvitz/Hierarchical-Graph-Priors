@@ -29,8 +29,7 @@ class MalmoEnvSpecial(gym.Env):
             elif m == "bucket_water":
                 spawn_entities += ["water"]
             else:
-                print("Bad mission",m)
-                exit()
+                raise ValueError("Bad mission {}".format(m))
 
 
         locations = np.random.choice(np.arange(len(self.poss_spawn_loc)), size=len(spawn_entities), replace=False)

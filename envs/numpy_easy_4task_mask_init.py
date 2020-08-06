@@ -3,38 +3,71 @@ import random
 import sys
 import gym
 from gym.spaces import Discrete
-
+from itertools import permutations
 
 class MalmoEnvSpecial(gym.Env):
 
-    def init_map(self, mission):
+    def get_all_config(self):
+        inits = []
+
+        for m in self.mission_types:
+            spawn_entities = []
+            if m == "pickaxe_stone":
+                spawn_entities += ["stone","pickaxe_item"]
+                goal = "cobblestone_item"
+            elif m == "axe_log":
+                spawn_entities += ["log","axe_item"]
+                goal = "log_item"
+            elif m == "hoe_farmland":
+                spawn_entities += ["dirt","hoe_item"]
+                goal = "farmland"
+            elif m == "bucket_water":
+                spawn_entities += ["water","bucket_item"]
+                goal = "water_bucket_item"
+
+            for additional_element in ["stone","log","water","dirt"]:
+                blocks = spawn_entities + [additional_element]
+                for p in permutations(blocks):
+                   inits.append((m,goal,p))
+        random.seed(0)
+        random.shuffle(inits)
+        return inits
+    
+        
+
+    def init_map(self): #, mission):
         arena = np.ones((2+2, 3+2))
         arena[1:-1,1:-1] = 0
       
-        spawn_entities = [] #["stone","log","water","dirt"]+["pickaxe_item","axe_item","bucket_item","hoe_item"]
+      #  spawn_entities = [] #["stone","log","water","dirt"]+["pickaxe_item","axe_item","bucket_item","hoe_item"]
  
-        all_missions = [mission] #+ [random.choice(self.mission_types)]
-        for m in all_missions:
-            if m == "pickaxe_stone":
-                spawn_entities += ["stone","pickaxe_item"]
-            elif m == "axe_log":
-                spawn_entities += ["log","axe_item"]
-            elif m == "hoe_farmland":
-                spawn_entities += ["dirt","hoe_item"]
-            elif m == "bucket_water":
-                spawn_entities += ["water","bucket_item"]
-            else:
-                raise ValueError("Bad mission {}".format(m))
+    #    all_missions = [mission] #+ [random.choice(self.mission_types)]
+    #    for m in all_missions:
+    #        if m == "pickaxe_stone":
+    #            spawn_entities += ["stone","pickaxe_item"]
+    #        elif m == "axe_log":
+    #            spawn_entities += ["log","axe_item"]
+    #        elif m == "hoe_farmland":
+    #            spawn_entities += ["dirt","hoe_item"]
+    #        elif m == "bucket_water":
+    #            spawn_entities += ["water","bucket_item"]
+    #        else:
+     #           print("Bad mission",m)
+     #           exit()
 
-        spawn_entities += [random.choice(["stone","log","water","dirt"])]
+       # spawn_entities += [random.choice(["stone","log","water","dirt"])]
 
    #     print(self.poss_spawn_loc)
 
 
-        locations = np.random.choice(np.arange(len(self.poss_spawn_loc)), size=len(spawn_entities), replace=False)
-        for ent,l in zip(spawn_entities,locations):
+        #locations = np.random.choice(np.arange(len(self.poss_spawn_loc)), size=len(spawn_entities), replace=False)
+       # for ent,l in zip(spawn_entities,locations):
+        choice = np.random.choice(np.arange(len(self.possible_configs)))
+        self.current_mission,self.goal,config = self.possible_configs[choice]
+        
+        for i,ent in enumerate(config):
             ent_id = self.object_2_index[ent]
-            coords = self.poss_spawn_loc[l]
+            coords = self.poss_spawn_loc[i]
             arena[coords[0]][coords[1]] = ent_id
 
         return arena
@@ -68,19 +101,23 @@ class MalmoEnvSpecial(gym.Env):
 
     def reset(self):
         if self.random:
-            self.current_mission = random.choice(self.mission_types)
-        if self.current_mission == "pickaxe_stone":
-            self.goal = "cobblestone_item"
-        elif self.current_mission == "axe_log":
-            self.goal = "log_item"
-        elif self.current_mission == "hoe_farmland":
-            self.goal = "farmland"
-        elif self.current_mission == "bucket_water":
-            self.goal = "water_bucket_item"
+             pass
+        else:
+            print("bad config")
+            exit()
+        #    self.current_mission = random.choice(self.mission_types)
+        #if self.current_mission == "pickaxe_stone":
+        #    self.goal = "cobblestone_item"
+        #elif self.current_mission == "axe_log":
+        #    self.goal = "log_item"
+        #elif self.current_mission == "hoe_farmland":
+        #    self.goal = "farmland"
+        #elif self.current_mission == "bucket_water":
+        #    self.goal = "water_bucket_item"
 
         self.player_x = 1
         self.player_y = 1
-        self.arena = self.init_map(self.current_mission)
+        self.arena = self.init_map() #self.current_mission)
         self.attacking = False
         self.using = False
         self.steps = 0
@@ -208,7 +245,7 @@ class MalmoEnvSpecial(gym.Env):
 
         return obs, reward, terminated, {"mission": self.current_mission}
 
-    def __init__(self, random, mission=False):
+    def __init__(self, random, mission=False,init_window=(0,None)):
         self.random = random
         if random == False:
             assert mission is not None
@@ -244,6 +281,12 @@ class MalmoEnvSpecial(gym.Env):
             "farmland_item": 15
         }
 
+        if init_window[1] is None:
+            self.possible_configs = self.get_all_config()[init_window[0]:]
+        else:
+            self.possible_configs = self.get_all_config()[init_window[0]:init_window[1]]
+        
+        print("possible inits:",len(self.possible_configs))
         self.index_2_object = {v: k for k, v in self.object_2_index.items()}
         self.collectable = {
             v for k, v in self.object_2_index.items() if "item" in k

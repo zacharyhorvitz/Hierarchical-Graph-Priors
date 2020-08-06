@@ -21,12 +21,10 @@ from envs.advanced_malmo_numpy_env_all_tools import MalmoEnvSpecial as EnvNpyAll
 from envs.advanced_malmo_numpy_env_correct_tool import MalmoEnvSpecial as EnvNpyCorrectTool
 from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as EnvNpyAllToolsEquip
 
-
-
 from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
 from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
-# from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
-from vis_distance_methods import load_embed_from_torch,visualize_similarity
+from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
+from embed_utils.vis_distance_methods import load_embed_from_torch, visualize_similarity
 
 args = parse_args()
 # Setting cuda seeds
@@ -58,8 +56,8 @@ elif args.env == 'npy_easy_4task':
     test_env = EnvEasy4(random=True, mission=None)
 
 elif args.env == 'npy_easy_4task_mask':
-    env = EnvEasy4_mask(random=True, mission=None,init_window=(0,76))
-    test_env = EnvEasy4_mask(random=True, mission=None,init_window=(76,None))
+    env = EnvEasy4_mask(random=True, mission=None, init_window=(0, 76))
+    test_env = EnvEasy4_mask(random=True, mission=None, init_window=(76, None))
 
 elif args.env == 'npy_stone':
     env = EnvNpy(random=False, mission="pickaxe_stone")
@@ -109,7 +107,7 @@ if args.mode == 'cnn':
 
 num_actions = 0
 if isinstance(env.action_space, gym.spaces.Dict):
-    for action_name, action in env.action_space.spaces.items(): 
+    for action_name, action in env.action_space.spaces.items():
         if isinstance(action, gym.spaces.Discrete):
             num_actions += action.n
         print("{} has {} actions".format(action_name, action.n))
@@ -119,7 +117,7 @@ else:
 # Initialize model
 agent_args = {
     "device": device,
-    "state_space": (env.observation_space[0],env.observation_space[1]),
+    "state_space": (env.observation_space[0], env.observation_space[1]),
     "action_space": env.action_space,
     "num_actions": num_actions,
     "target_moving_average": args.target_moving_average,
@@ -137,11 +135,12 @@ agent_args = {
     "emb_size": args.emb_size,
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
-    "aux_dist_loss": args.aux_dist_loss,
+    "aux_dist_loss_coeff": args.aux_dist_loss_coeff,
+    "contrastive_loss_coeff": args.contrastive_loss_coeff,
     "self_attention": args.self_attention,
     "use_layers": args.use_layers,
-    "converged_init":args.converged_init,
-    "dist_path":args.dist_path,
+    "converged_init": args.converged_init,
+    "dist_path": args.dist_path,
     "reverse_direction": args.reverse_direction
 }
 agent = DQN_agent(**agent_args)
@@ -188,7 +187,6 @@ if not args.no_tensorboard:
 else:
     writer = None
 
-
 # Episode loop
 global_steps = 0
 steps = 1
@@ -200,16 +198,14 @@ if not os.path.exists(args.dist_save_folder):
     os.mkdir(args.dist_save_folder)
 
 if args.save_dist_freq != -1:
-      node_to_sim_index = {v:k for k,v in agent.online.object_to_char.items()}
+    node_to_sim_index = {v: k for k, v in agent.online.object_to_char.items()}
 
 if args.load_checkpoint_path and checkpoint is not None:
     global_steps = checkpoint['global_steps']
     episode = checkpoint['episode']
 
 while global_steps < args.max_steps:
-    print(
-        f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start+0.001)}"
-    )
+    print(f"Episode: {episode}, steps: {global_steps}, FPS: {steps/(end - start+0.001)}")
     start = time.time()
     state = env.reset()
     done = False
@@ -220,27 +216,25 @@ while global_steps < args.max_steps:
     # Collect data from the environment
     while not done:
         global_steps += 1
-        if args.save_dist_freq != -1 and int(global_steps-1) % args.save_dist_freq == 0:
+        if args.save_dist_freq != -1 and int(global_steps - 1) % args.save_dist_freq == 0:
             print("SAVING")
-            name_to_embeddings = load_embed_from_torch(agent.online.state_dict()["embeds.weight"],node_to_sim_index)
-            file_name =  os.path.join(args.dist_save_folder, f"checkpoint_{run_tag}")+ f"_{global_steps}"
-            visualize_similarity(name_to_embeddings,file_name)
-            #exit()
+            name_to_embeddings = load_embed_from_torch(agent.online.state_dict()["embeds.weight"],
+                                                       node_to_sim_index)
+            file_name = os.path.join(args.dist_save_folder,
+                                     f"checkpoint_{run_tag}") + f"_{global_steps}"
+            visualize_similarity(name_to_embeddings, file_name)
         action = agent.online.act(state, agent.online.epsilon)
         next_state, reward, done, info = env.step(action)
         steps += 1
         if args.reward_clip:
-            clipped_reward = np.clip(reward, -args.reward_clip,
-                                     args.reward_clip)
+            clipped_reward = np.clip(reward, -args.reward_clip, args.reward_clip)
         else:
             clipped_reward = reward
-        agent.replay_buffer.append(
-            Experience(state, action, clipped_reward, next_state, int(done)))
+        agent.replay_buffer.append(Experience(state, action, clipped_reward, next_state, int(done)))
         state = next_state
 
         # If not enough data, try again
-        if len(agent.replay_buffer
-              ) < args.batchsize or global_steps < args.warmup_period:
+        if len(agent.replay_buffer) < args.batchsize or global_steps < args.warmup_period:
             continue
 
         # This is list<experiences>
@@ -259,12 +253,10 @@ while global_steps < args.max_steps:
         cumulative_loss += loss.item()
         loss.backward()
         if args.gradient_clip:
-            torch.nn.utils.clip_grad_norm_(agent.online.parameters(),
-                                           args.gradient_clip)
+            torch.nn.utils.clip_grad_norm_(agent.online.parameters(), args.gradient_clip)
         # Update parameters
         optimizer.step()
         agent.sync_networks()
-            
 
         if args.model_path is not None:
             if global_steps % args.checkpoint_steps == 0:
@@ -278,9 +270,8 @@ while global_steps < args.max_steps:
                         "optimizer_state_dict": optimizer.state_dict(),
                         "episode": episode,
                     },
-                    append_timestamp(
-                        os.path.join(args.model_path, f"checkpoint_{run_tag}"))
-                    + f"_{global_steps}.tar")
+                    append_timestamp(os.path.join(args.model_path, f"checkpoint_{run_tag}")) +
+                    f"_{global_steps}.tar")
 
         # Testing policy
         if global_steps % args.test_policy_steps == 0:
@@ -294,8 +285,7 @@ while global_steps < args.max_steps:
                     test_state = test_env.reset()
                     test_action = agent.online.act(test_state, 0)
                     test_done = False
-                    render = args.render and (episode %
-                                              args.render_episodes == 0)
+                    render = args.render and (episode % args.render_episodes == 0)
 
                     # Test episode loop
                     while not test_done:
@@ -303,10 +293,8 @@ while global_steps < args.max_steps:
                         if render:
                             env.render()
 
-                        test_state, t_reward, test_done, info = test_env.step(
-                            test_action)
-                        test_action = agent.online.act(
-                            test_state, 0)  # passing in epsilon = 0
+                        test_state, t_reward, test_done, info = test_env.step(test_action)
+                        test_action = agent.online.act(test_state, 0)  # passing in epsilon = 0
                         # Update reward
                         test_reward += t_reward
 
@@ -336,12 +324,10 @@ while global_steps < args.max_steps:
                         f.write(f"{episode},{global_steps},{k},{v}\n")
 
     if not args.no_tensorboard:
-        writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps,
-                          episode)
+        writer.add_scalar('training/avg_episode_loss', cumulative_loss / steps, episode)
     end = time.time()
     episode += 1
-    if len(agent.replay_buffer
-          ) < args.batchsize or global_steps < args.warmup_period:
+    if len(agent.replay_buffer) < args.batchsize or global_steps < args.warmup_period:
         continue
 
     #if episode % 500 == 0:
@@ -350,6 +336,4 @@ while global_steps < args.max_steps:
 
 env.close()
 if args.model_path:
-    torch.save(
-        agent.online,
-        append_timestamp(os.path.join(args.model_path, run_tag)) + ".pth")
+    torch.save(agent.online, append_timestamp(os.path.join(args.model_path, run_tag)) + ".pth")

@@ -20,9 +20,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         self_attention=False):
         # initialize all parameters
         super(DUELING_DQN_MALMO_CNN_model, self).__init__()
-        print("using DDQN MALMO CNN {} {} {}".format(num_frames,
-                                                     final_dense_layer,
-                                                     state_space))
+        print("using DDQN MALMO CNN {} {} {}".format(num_frames, final_dense_layer, state_space))
         self.state_space = state_space
         self.action_space = action_space
         self.device = device
@@ -34,8 +32,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         else:
             self.input_shape = state_space
         self.emb_size = emb_size
-        self.embedded_state_size = self.emb_size * self.input_shape[
-            0] * self.input_shape[1]
+        self.embedded_state_size = self.emb_size * self.input_shape[0] * self.input_shape[1]
         self.mode = mode
         self.hier = hier
 
@@ -53,11 +50,17 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         # First layer takes in states
         node_2_game_char = self.build_gcn(self.mode, self.hier)
 
-        self.block_1 = CNN_NODE_ATTEN_BLOCK(1, 32, 3, self.emb_size,
+        self.block_1 = CNN_NODE_ATTEN_BLOCK(1,
+                                            32,
+                                            3,
+                                            self.emb_size,
                                             node_2_game_char,
                                             self.self_attention,
                                             self.mode not in ['cnn', 'dueling'])
-        self.block_2 = CNN_NODE_ATTEN_BLOCK(32, 32, 3, self.emb_size,
+        self.block_2 = CNN_NODE_ATTEN_BLOCK(32,
+                                            32,
+                                            3,
+                                            self.emb_size,
                                             node_2_game_char,
                                             self.self_attention,
                                             self.mode not in ['cnn', 'dueling'])
@@ -76,7 +79,8 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         self.value_stream = torch.nn.Sequential(*[
             torch.nn.Linear(
                 final_size[0] * final_size[1] * 32 + self.embedding_size +
-                val_additional_embedding_size, self.final_dense_layer),
+                val_additional_embedding_size,
+                self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, 1)
         ])
@@ -84,22 +88,21 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         self.advantage_stream = torch.nn.Sequential(*[
             torch.nn.Linear(
                 final_size[0] * final_size[1] * 32 + self.embedding_size +
-                adv_additional_embedding_size, self.final_dense_layer),
+                adv_additional_embedding_size,
+                self.final_dense_layer),
             torch.nn.ReLU(),
             torch.nn.Linear(self.final_dense_layer, self.num_actions)
         ])
 
         self.build_gcn(self.mode, self.hier)
 
-        trainable_parameters = sum(
-            p.numel() for p in self.parameters() if p.requires_grad)
+        trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
     def build_gcn(self, mode, hier):
 
         if not hier and mode == "ling_prior":
-            print("{} requires hier".format(mode))
-            exit()
+            raise ValueError("{} requires hier".format(mode))
 
         object_to_char = {
             "air": 0,
@@ -120,8 +123,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
             "farmland_item": 15,
         }
         non_node_objects = ["air", "wall"]
-        game_nodes = sorted(
-            [k for k in object_to_char.keys() if k not in non_node_objects])
+        game_nodes = sorted([k for k in object_to_char.keys() if k not in non_node_objects])
 
         if mode in ["both", "adv_graph", "val_graph"] and not hier:
             # yapf: disable
@@ -147,7 +149,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
 
         total_objects = len(game_nodes + latent_nodes + non_node_objects)
         name_2_node = {e: i for i, e in enumerate(game_nodes + latent_nodes)}
-        node_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)} 
+        node_2_game = {i: object_to_char[name] for i, name in enumerate(game_nodes)}
 
         num_nodes = len(game_nodes + latent_nodes)
 
@@ -181,9 +183,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
                     if mode in ["skyline", "skyline_atten"]:
                         glove_dict = glove_dict["skyline"]
 
-                    elif mode in [
-                            "skyline_hier", "skyline_hier_atten", "fully_connected"
-                    ]:
+                    elif mode in ["skyline_hier", "skyline_hier_atten", "fully_connected"]:
                         glove_dict = glove_dict["skyline_hier"]
 
                     elif mode in ["skyline_simple", "skyline_simple_atten"]:
@@ -195,8 +195,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
                 node_glove_embed = []
                 for node in sorted(game_nodes + latent_nodes, key=lambda x: name_2_node[x]):
                     embed = np.array([
-                        glove_dict[x]
-                        for x in node.replace(" ", "_").replace("-", "_").split("_")
+                        glove_dict[x] for x in node.replace(" ", "_").replace("-", "_").split("_")
                     ])
                     embed = torch.FloatTensor(np.mean(embed, axis=0))
                     node_glove_embed.append(embed)
@@ -206,24 +205,24 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
                 node_glove_embed = None
 
             self.val_gcn = GCN(v_adjacency,
-                           self.device,
-                           num_nodes,
-                           total_objects,
-                           node_2_game,
-                           use_graph=use_graph,
-                           atten=self.atten,
-                           emb_size=self.emb_size,
-                           node_glove_embed=node_glove_embed)
+                               self.device,
+                               num_nodes,
+                               total_objects,
+                               node_2_game,
+                               use_graph=use_graph,
+                               atten=self.atten,
+                               emb_size=self.emb_size,
+                               node_glove_embed=node_glove_embed)
 
             self.adv_gcn = GCN(a_adjacency,
-                           self.device,
-                           num_nodes,
-                           total_objects,
-                           node_2_game,
-                           use_graph=use_graph,
-                           atten=self.atten,
-                           emb_size=self.emb_size,
-                           node_glove_embed=node_glove_embed)
+                               self.device,
+                               num_nodes,
+                               total_objects,
+                               node_2_game,
+                               use_graph=use_graph,
+                               atten=self.atten,
+                               emb_size=self.emb_size,
+                               node_glove_embed=node_glove_embed)
 
         elif mode in ["cnn", "embed_bl"]:
             adjacency = torch.FloatTensor(torch.zeros(len(edges), num_nodes, num_nodes))
@@ -254,7 +253,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
         if extract_goal:
             goals = state[:, :, :, 0][:, 0, 0].clone().detach().long()
             state = state[:, :, :, 1:]
-      
+
         #   print(goals)
 
         #print(self.mode,self.hier)
@@ -262,9 +261,7 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
 
         if self.mode in graph_modes:
             node_embeds = self.gcn.gcn_embed()
-            goal_embeddings = node_embeds[[
-                self.gcn.game_char_to_node[g.item()] for g in goals
-            ]]
+            goal_embeddings = node_embeds[[self.gcn.game_char_to_node[g.item()] for g in goals]]
         elif self.mode == "cnn":
             node_embeds = None
             goal_embeddings = self.gcn.obj_emb(goals)
@@ -279,26 +276,20 @@ class DUELING_DQN_MALMO_CNN_model(torch.nn.Module):
             out = self.block_2(state, out, node_embeds, goal_embeddings)
             out = F.relu(out)
             cnn_output = out.reshape(out.size(0), -1)
-            val_state_embeddings, val_node_embeds = self.val_gcn.embed_state(
-                state.long())
-            val_state_embeddings = val_state_embeddings.reshape(
-                val_state_embeddings.shape[0], -1)
+            val_state_embeddings, val_node_embeds = self.val_gcn.embed_state(state.long())
+            val_state_embeddings = val_state_embeddings.reshape(val_state_embeddings.shape[0], -1)
             val_goal_embeddings = val_node_embeds[[
                 self.val_gcn.game_char_to_node[g.item()] for g in goals
             ]]
-            val_input = torch.cat(
-                (cnn_output, val_goal_embeddings, val_state_embeddings), -1)
+            val_input = torch.cat((cnn_output, val_goal_embeddings, val_state_embeddings), -1)
             values = self.value_stream(val_input)
 
-            adv_state_embeddings, adv_node_embeds = self.adv_gcn.embed_state(
-                state.long())
-            adv_state_embeddings = adv_state_embeddings.reshape(
-                adv_state_embeddings.shape[0], -1)
+            adv_state_embeddings, adv_node_embeds = self.adv_gcn.embed_state(state.long())
+            adv_state_embeddings = adv_state_embeddings.reshape(adv_state_embeddings.shape[0], -1)
             adv_goal_embeddings = adv_node_embeds[[
                 self.adv_gcn.game_char_to_node[g.item()] for g in goals
             ]]
-            adv_input = torch.cat(
-                (cnn_output, adv_goal_embeddings, adv_state_embeddings), -1)
+            adv_input = torch.cat((cnn_output, adv_goal_embeddings, adv_state_embeddings), -1)
             advantage = self.advantage_stream(adv_input)
             q_value = values + (advantage - advantage.mean())
 
