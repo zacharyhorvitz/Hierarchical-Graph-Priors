@@ -9,25 +9,15 @@ from datetime import datetime
 def parse_args():
     # Parse input arguments
     # Use --help to see a pretty description of the arguments
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env',
                         help='The malmo environment to train on',
                         type=str,
                         default='npy',
                         required=True)
-    parser.add_argument('--run-tag',
-                        help='Tag to identify experiment',
-                        type=str,
-                        required=True)
-    parser.add_argument('--address',
-                        help='ip address',
-                        type=str,
-                        required=False)
-    parser.add_argument('--port',
-                        help='Port',
-                        type=int,
-                        required=False)
+    parser.add_argument('--run-tag', help='Tag to identify experiment', type=str, required=True)
+    parser.add_argument('--address', help='ip address', type=str, required=False)
+    parser.add_argument('--port', help='Port', type=int, required=False)
     parser.add_argument('--model-type',
                         help="Type of architecture",
                         type=str,
@@ -38,11 +28,7 @@ def parse_args():
                         help='The path to the save the pytorch model',
                         type=str,
                         required=False)
-    parser.add_argument('--gamma',
-                        help='Gamma parameter',
-                        type=float,
-                        default=0.99,
-                        required=False)
+    parser.add_argument('--gamma', help='Gamma parameter', type=float, default=0.99, required=False)
     parser.add_argument('--output-path',
                         help='The output directory to store training stats',
                         type=str,
@@ -60,10 +46,7 @@ def parse_args():
                         help='Use atari preprocessing',
                         action='store_false',
                         required=False)
-    parser.add_argument('--gpu',
-                        help='Use the gpu or not',
-                        action='store_true',
-                        required=False)
+    parser.add_argument('--gpu', help='Use the gpu or not', action='store_true', required=False)
     parser.add_argument('--render',
                         help='Render visual or not',
                         action='store_true',
@@ -153,17 +136,9 @@ def parse_args():
                         type=int,
                         default=10,
                         required=False)
-    parser.add_argument('--use-hier',
-                        help='Use latent nodes',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--mode',
-                        help='select mode',
-                        required=True)
-    parser.add_argument('--atten',
-                        help='Use block attention',
-                        action='store_true',
-                        required=False)
+    parser.add_argument('--use-hier', help='Use latent nodes', action='store_true', required=False)
+    parser.add_argument('--mode', help='select mode', required=True)
+    parser.add_argument('--atten', help='Use block attention', action='store_true', required=False)
     parser.add_argument('--one_layer',
                         help='just compute attention over neighbors',
                         action='store_true',
@@ -182,12 +157,12 @@ def parse_args():
                         type=int,
                         default=0,
                         required=False)
-    
+
     parser.add_argument('--self_attention',
                         help='specify whether self attention applied to node embeddings',
                         action='store_true',
                         required=False)
-    
+
     parser.add_argument('--use_layers',
                         help='number of GCN layers',
                         type=int,
@@ -230,10 +205,8 @@ def init_weights(m):
 
 
 def sync_networks(target, online, alpha):
-    for online_param, target_param in zip(online.parameters(),
-                                          target.parameters()):
-        target_param.data.copy_(alpha * online_param.data +
-                                (1 - alpha) * target_param.data)
+    for online_param, target_param in zip(online.parameters(), target.parameters()):
+        target_param.data.copy_(alpha * online_param.data + (1 - alpha) * target_param.data)
 
 
 # Adapted from pytorch tutorials:
@@ -246,7 +219,6 @@ def conv2d_size_out(size, kernel_size, stride):
 def deque_to_tensor(last_num_frames):
     """ Convert deque of n frames to tensor """
     return torch.cat(list(last_num_frames), dim=0)
-
 
 
 # Thanks to RoshanRane - Pytorch forums
