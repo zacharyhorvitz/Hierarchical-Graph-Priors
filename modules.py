@@ -85,6 +85,8 @@ class GCN(torch.nn.Module):
         return x
 
 
+
+
 class LINEAR_INV_BLOCK(torch.nn.Module):
     def __init__(self, input_embed_sz, output_size, n=9):
         #super(CNN_NODE_ATTEN_BLOCK, self).__init__()
@@ -155,6 +157,8 @@ def contrastive_loss_func(device,
                           positive_margin,
                           negative_margin):
 
+    # NOTE: This will double count if the graph has a cycle 
+
     loss = torch.tensor([0], dtype=torch.float32, device=device)
     dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
 
@@ -163,12 +167,11 @@ def contrastive_loss_func(device,
             if node1 == node2:
                 continue
             if node_to_name[node1] in latent_nodes or node_to_name[node2] in latent_nodes:
-                loss += torch.max(
+                loss += adjacency[node1][node2] * torch.max(
                     torch.tensor([positive_margin, dist_matrix[node1][node2]],
                                  device=device)) - positive_margin
             else:
-                loss += torch.max(
-                    torch.tensor([0, negative_margin - dist_matrix[node1][node2]],
+                loss += torch.max(torch.tensor([0, negative_margin - dist_matrix[node1][node2]],
                                  dtype=torch.float32,
                                  device=device))
 

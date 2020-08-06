@@ -524,6 +524,7 @@ class DQN_agent:
 
             # Get adjacency matrix
             adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
+            adjacency = adjacency.transpose() # NOTE adjacency is transposed, we're undoing it
 
             # Get edge list
             edges = self.online.edges[0]  # NOTE does not support multiple edge types
