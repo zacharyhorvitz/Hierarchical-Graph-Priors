@@ -72,9 +72,9 @@ class GCN(torch.nn.Module):
             layer_out = []
             for e in range(self.num_edges):
                 if self.atten:
-                    weighting = F.normalize(self.attention[e] * self.A[e])
+                    weighting = F.normalize(self.attention[e] * self.A[e].float())
                 else:
-                    weighting = F.normalize(self.A[e])
+                    weighting = F.normalize(self.A[e].float())
                 layer_out.append(torch.mm(weighting, x))  #)
             x = torch.cat([
                 relu(self.weights[e][l](type_features)) for e,
@@ -83,8 +83,6 @@ class GCN(torch.nn.Module):
                           axis=1)
         x = self.final_mapping(x)
         return x
-
-
 
 
 class LINEAR_INV_BLOCK(torch.nn.Module):
@@ -147,35 +145,6 @@ def embed_state(game_board, state, node_embeddings, node_2_game_char):
 
     state += node_embeddings
     return state.permute((0, 3, 1, 2))  #, node_embeddings
-
-
-def contrastive_loss_func(device,
-                          node_embeddings,
-                          adjacency,
-                          latent_nodes,
-                          node_to_name,
-                          positive_margin,
-                          negative_margin):
-
-    # NOTE: This will double count if the graph has a cycle 
-
-    loss = torch.tensor([0], dtype=torch.float32, device=device)
-    dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
-
-    for node1 in range(len(adjacency)):
-        for node2 in range(len(adjacency)):
-            if node1 == node2:
-                continue
-            if node_to_name[node1] in latent_nodes or node_to_name[node2] in latent_nodes:
-                loss += adjacency[node1][node2] * torch.max(
-                    torch.tensor([positive_margin, dist_matrix[node1][node2]],
-                                 device=device)) - positive_margin
-            else:
-                loss += torch.max(torch.tensor([0, negative_margin - dist_matrix[node1][node2]],
-                                 dtype=torch.float32,
-                                 device=device))
-
-    return loss
 
 
 def self_attention(K, V, Q):
@@ -346,16 +315,16 @@ def malmo_build_gcn_param(object_to_char, mode, hier, use_layers, reverse_direct
     print("Latent Nodes:", latent_nodes)
     print("Edges:", edges)
 
-    adjacency = torch.FloatTensor(torch.zeros(len(edges), num_nodes, num_nodes))
+    adjacency = torch.zeros(len(edges), num_nodes, num_nodes, dtype=torch.uint8)
     for edge_type in range(len(edges)):
         for i in range(num_nodes):
-            adjacency[edge_type][i][i] = 1.0
+            adjacency[edge_type][i][i] = 1
         for s, d in edges[edge_type]:
-            adjacency[edge_type][name_to_node[d]][name_to_node[s]] = 1.0  #corrected transpose!!!!
+            adjacency[edge_type][name_to_node[d]][name_to_node[s]] = 1  #corrected transpose!!!!
     if reverse_direction:
         adjacency = torch.transpose(adjacency, 1, 2)
     if mode == "fully_connected":
-        adjacency = torch.FloatTensor(torch.ones(1, num_nodes, num_nodes))
+        adjacency = torch.ones(1, num_nodes, num_nodes, dtype=torch.uint8)
 
     #if self.use_glove:
     # import json

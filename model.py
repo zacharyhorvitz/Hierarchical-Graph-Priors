@@ -8,7 +8,7 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.functional import relu
 
-from modules import GCN, LINEAR_INV_BLOCK, malmo_build_gcn_param, contrastive_loss_func
+from modules import GCN, LINEAR_INV_BLOCK, malmo_build_gcn_param
 from utils import sync_networks, conv2d_size_out
 
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done'])
@@ -24,6 +24,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         state_space,
         action_space,
         num_actions,
+        aux_dist_loss_coeff,
+        contrastive_loss_coeff,
+        positive_margin,
+        negative_margin,
         num_frames=1,
         final_dense_layer=50,
         #input_shape=(9, 9),
@@ -33,7 +37,6 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         one_layer=False,
         emb_size=16,
         multi_edge=False,
-        aux_dist_loss_coeff=0,
         self_attention=False,
         reverse_direction=False,
         converged_init=None,
@@ -62,6 +65,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.emb_size = emb_size
         self.multi_edge = multi_edge
         self.aux_dist_loss_coeff = aux_dist_loss_coeff
+        self.contrastive_loss_coeff = contrastive_loss_coeff
+        self.positive_margin = positive_margin
+        self.negative_margin = negative_margin
         self.self_attention = self_attention
         self.reverse_direction = reverse_direction
         self.use_layers = use_layers
@@ -168,10 +174,24 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
             self.node_to_game_char = node_to_game
             self.node_to_name = node_to_name
+            self.name_to_node = {v: k for k, v in self.node_to_name.items()}
             self.adjacency = adjacency
+
             self.edges = edges
             self.latent_nodes = latent_nodes
+            self.latent_node_idx = [self.name_to_node[l] for l in self.latent_nodes]
 
+            if self.contrastive_loss_coeff != 0:
+                # NOTE does not support multiple edge types
+                # NOTE adjacency is transposed, we're undoing it
+                self.untransposed_adjacency = adjacency[0].transpose(0, 1).to(self.device)
+                self.contrastive_mask = torch.zeros_like(self.untransposed_adjacency,
+                                                         dtype=torch.uint8)
+                self.contrastive_mask[self.latent_node_idx, :] = 1
+                self.contrastive_mask[:, self.latent_node_idx] = 1
+                self.contrastive_mask *= self.untransposed_adjacency
+                self.positive_margin = torch.as_tensor(self.positive_margin, device=self.device)
+                self.negative_margin = torch.as_tensor(self.negative_margin, device=self.device)
 
             self.gcn = GCN(adjacency,
                            self.device,
@@ -272,14 +292,28 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
     def get_true_dist(self):
         #TODO: load embedding distance in model init, fix alignment with keys, matrix
 
-        dist = self.goal_dist[self.pairs[:,0],self.pairs[:,1]]
+        dist = self.goal_dist[self.pairs[:, 0], self.pairs[:, 1]]
         dist = dist / torch.mean(dist)
-
 
         return dist
 
     def get_pairwise_loss(self):
         return self.pairwise_loss(self.embed_pairs(), self.get_true_dist().cuda())
+
+    def contrastive_loss_func(self, positive_margin, negative_margin):
+
+        # NOTE: This will double count if the graph has a cycle
+
+        node_embeddings, _ = self.get_embeddings(None)
+        dist_matrix = torch.cdist(node_embeddings, node_embeddings, p=2)
+        pos_loss = self.untransposed_adjacency * torch.max(self.positive_margin,
+                                                           dist_matrix - self.positive_margin)
+        neg_loss = torch.max(torch.as_tensor(0, dtype=torch.float32, device=self.device),
+                             self.negative_margin - dist_matrix)
+
+        loss = torch.where(self.contrastive_mask, pos_loss, neg_loss)
+
+        return loss.sum()
 
     def preprocess_state(self, state, extract_goal=True, extract_inv=True):
         inventory = None
@@ -423,7 +457,7 @@ class DQN_agent:
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
         self.aux_dist_loss_coeff = aux_dist_loss_coeff
-        self.contrastive_loss_coeff = contrastive_loss_coeff 
+        self.contrastive_loss_coeff = contrastive_loss_coeff
         self.positive_margin = positive_margin
         self.negative_margin = negative_margin
         self.mode = mode
@@ -435,12 +469,15 @@ class DQN_agent:
                                               state_space,
                                               action_space,
                                               num_actions,
+                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
+                                              contrastive_loss_coeff=contrastive_loss_coeff,
+                                              negative_margin=negative_margin,
+                                              positive_margin=positive_margin,
                                               num_frames=num_frames,
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
                                               reverse_direction=reverse_direction,
@@ -453,12 +490,15 @@ class DQN_agent:
                                               state_space,
                                               action_space,
                                               num_actions,
+                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
+                                              contrastive_loss_coeff=contrastive_loss_coeff,
+                                              negative_margin=negative_margin,
+                                              positive_margin=positive_margin,
                                               num_frames=num_frames,
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
                                               multi_edge=multi_edge,
-                                              aux_dist_loss_coeff=aux_dist_loss_coeff,
                                               emb_size=emb_size,
                                               use_layers=use_layers,
                                               reverse_direction=reverse_direction,
@@ -521,36 +561,24 @@ class DQN_agent:
             writer.add_scalar('training/batch_q_pred', q_pred_batch.mean(), writer_step)
             writer.add_scalar('training/batch_reward', reward_tensor.mean(), writer_step)
 
-
         loss = torch.nn.functional.mse_loss(q_label_batch, q_pred_batch)
-        
+
         if self.contrastive_loss_coeff != 0:
-            # Get the embeddings
-            node_embeds, _ = self.online.get_embeddings(None)
 
-            # Get adjacency matrix
-            adjacency = self.online.adjacency[0]  # NOTE does not support multiple edge types
-            adjacency = adjacency.transpose(0, 1) # NOTE adjacency is transposed, we're undoing it
+            contrastive_loss = self.online.contrastive_loss_func(self.positive_margin,
+                                                                 self.negative_margin)
 
-            # Get edge list
-            edges = self.online.edges[0]  # NOTE does not support multiple edge types
+            if writer:
+                writer.add_scalar('training/contrastive_loss', contrastive_loss, writer_step)
 
-            # Get conversions and list of latent nodes
-            latent_nodes = self.online.latent_nodes
-            conversion_dict = self.online.node_to_name
-
-            contrastive_loss = contrastive_loss_func(self.device,
-                                                     node_embeds,
-                                                     adjacency,
-                                                     latent_nodes,
-                                                     conversion_dict,
-                                                     self.positive_margin,
-                                                     self.negative_margin)
-
-            loss += self.contrastive_loss_coeff * contrastive_loss.item()
+            loss += self.contrastive_loss_coeff * contrastive_loss
 
         if self.aux_dist_loss_coeff != 0:
             aux_dist_loss = self.online.get_pairwise_loss()
+
+            if writer:
+                writer.add_scalar('training/aux_dist_loss', aux_dist_loss, writer_step)
+
             loss += self.aux_dist_loss_coeff * aux_dist_loss
 
         return loss
