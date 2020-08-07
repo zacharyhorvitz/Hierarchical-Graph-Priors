@@ -182,7 +182,7 @@ def malmo_build_gcn_param(object_to_char, mode, hier, use_layers, reverse_direct
     game_nodes = sorted([k for k in object_to_char.keys()],
                         key=lambda x: object_to_char[x])  # if k not in non_node_objects])
 
-    if mode in ["skyline", "skyline_atten","skyline_nogcn"]:  # and not hier:
+    if mode in ["skyline", "skyline_atten", "skyline_nogcn"]:  # and not hier:
         edges = [[("pickaxe_item", "stone"), ("axe_item", "log"), ("log", "log_item"),
                   ("hoe_item", "dirt"), ("bucket_item", "water"), ("stone", "cobblestone_item"),
                   ("dirt", "farmland"), ("water", "water_bucket_item")]]
@@ -214,7 +214,7 @@ def malmo_build_gcn_param(object_to_char, mode, hier, use_layers, reverse_direct
 
     elif mode in [
             "skyline_hier",
-             "skyline_hier_nogcn",
+            "skyline_hier_nogcn",
             "skyline_hier_dw_noGCN",
             "skyline_hier_dw_noGCN_dynamic",
             "skyline_hier_atten",
