@@ -85,8 +85,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "fully_connected",
             "skyline_hier_multi",
             "skyline_hier_multi_atten",
-            "skyline_hier_dw_noGCN",
-            "skyline_hier_dw_noGCN_dynamic"
+            
+        }
+
+        self.no_gcn_graph_models = {
+           "skyline_hier_nogcn",
+            "skyline_nogcn"
         }
 
         self.build_model()
@@ -163,7 +167,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         else:
             raise ValueError("Unexpected state space {}".format(self.state_space))
 
-        if self.mode in self.graph_modes:
+        if self.mode in self.graph_modes or self.mode in self.no_gcn_graph_models:
             num_nodes, node_to_name, node_to_game, adjacency, edges, latent_nodes = malmo_build_gcn_param(
                                                                             self.object_to_char,
                                                                             self.mode,
@@ -193,13 +197,14 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 self.positive_margin = torch.as_tensor(self.positive_margin, device=self.device)
                 self.negative_margin = torch.as_tensor(self.negative_margin, device=self.device)
 
-            self.gcn = GCN(adjacency,
-                           self.device,
-                           num_nodes,
-                           node_to_game,
-                           atten=self.atten,
-                           emb_size=self.emb_size,
-                           use_layers=self.use_layers)
+            if self.mode in self.graph_modes:
+                self.gcn = GCN(adjacency,
+                               self.device,
+                               num_nodes,
+                               node_to_game,
+                               atten=self.atten,
+                               emb_size=self.emb_size,
+                               use_layers=self.use_layers)
 
             self.embeds = torch.nn.Embedding(num_nodes, self.num_frames)
             self.object_list = torch.arange(0, num_nodes)
@@ -353,7 +358,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             if not goals is None:
                 goal_embeddings = self.embeds(goals)
 
-        elif self.mode == "embed_bl":
+        elif self.mode == "embed_bl" or self.mode in self.no_gcn_graph_models:
             node_embeds = self.embeds(self.object_list)
 
             if not goals is None:
