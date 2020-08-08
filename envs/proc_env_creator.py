@@ -8,19 +8,17 @@ from gym.spaces import Discrete
 class MalmoEnvSpecial(gym.Env):
 
     def generate_game_properties(self,num_tools,num_blocks):
-        self.tools = np.arange(2,num_tools+2)
 
-        block_start = np.max(self.tools)+1
-        block_end = block_start + num_blocks
+        all_objects = np.arange(2,2+num_tools+2*num_blocks)
+        np.random.shuffle(all_objects)
 
-        self.blocks = np.arange(block_start,block_end)
-        self.drops = np.arange(block_end,block_end+num_blocks)
+
+        self.tools = all_objects[:num_tools]
+        self.blocks = all_objects[num_tools:num_tools+num_blocks]
+        self.drops = all_objects[num_tools+num_blocks:]
 
         block_properties_dict = {}
         tool_dict = {t:[] for t in self.tools}
-
-        np.random.shuffle(self.blocks)
-        np.random.shuffle(self.drops)
 
         for b,d in zip(self.blocks,self.drops):
             tool_choice = random.choice(self.tools)
@@ -138,7 +136,10 @@ class MalmoEnvSpecial(gym.Env):
                 self.arena[self.player_y][self.player_x] = 0
 
         if self.attacking:
+            # print("attacking with",self.equipped_item)
             if self.equipped_item in self.tool_dict:
+                # print("tool for..",self.tool_dict[self.equipped_item])
+
                 if self.arena[self.player_y +
                           1][self.player_x] in self.tool_dict[self.equipped_item]:
                            
@@ -147,7 +148,7 @@ class MalmoEnvSpecial(gym.Env):
         self.attacking = False
         goal = self.check_reached_goal()
         reward = self.goal_reward if goal else self.step_cost
-        if goal: print("SUCCEEDED")
+        # if goal: print("SUCCEEDED")
 
         if self.steps >= self.max_steps:
             terminated = True
@@ -173,8 +174,8 @@ class MalmoEnvSpecial(gym.Env):
         self.goal_reward = 10.0
         self.max_steps = 25.0
       
-        self.collectable = set(self.drops).union(self.tools)
-        self.passable = self.collectable.union([0]).union(self.tools)
+        self.collectable = set(list(self.drops)+list(self.tools))
+        self.passable = set(list(self.collectable)+[0])
         self.poss_spawn_loc = []
         for y in range(2,3):
              for x in range(1, 5):
@@ -185,6 +186,8 @@ class MalmoEnvSpecial(gym.Env):
 
 
 if __name__ == "__main__":
+
+    #CONIRM HITTING DYNAMICS!!
 
     env = MalmoEnvSpecial(4,4)
     obs = env.reset()

@@ -130,6 +130,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         if self.state_space == (9, 9):
 
             self.extract_goal, self.extract_inv = True, True
+            self.extract_equipped = False
 
             self.body = torch.nn.Sequential(*[
                 torch.nn.Conv2d(
@@ -152,6 +153,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         elif self.state_space == (2, 3):
 
             self.extract_goal, self.extract_inv = False, False
+            self.extract_equipped = False
+
 
             self.body = torch.nn.Sequential(*[
             torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 8, kernel_size=(2, 2), stride=1), #8
@@ -163,6 +166,23 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 torch.nn.ReLU(),
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
+
+        elif self.state_space == (2, 4):
+
+            self.extract_goal, self.extract_inv = True, False
+            self.extract_equipped = True
+
+            self.body = torch.nn.Sequential(*[
+            torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 8, kernel_size=(2, 2), stride=1), #8
+            torch.nn.ReLU()
+            ])
+
+            self.head = torch.nn.Sequential(*[
+                torch.nn.Linear(8 * 3+2*self.emb_size, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.num_actions)
+            ])
+
 
         else:
             raise ValueError("Unexpected state space {}".format(self.state_space))
@@ -320,7 +340,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         return loss.sum()
 
-    def preprocess_state(self, state, extract_goal=True, extract_inv=True):
+    def preprocess_state(self, state, extract_goal=True, extract_inv=True, extract_equipped=True):
         inventory = None
         equipped = None
         goals = None
@@ -333,16 +353,36 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         if extract_inv:
             inventory = state[:, :, :, 0].clone().squeeze(1).detach().long()
-            state = state[:, :, :, 1:].long()
-            equipped = state[:, :, 4, 4].clone().detach().long()
-            inventory = torch.cat((equipped, inventory), 1)
+            state = state[:, :, :, 1:] #.long()
+
+            # inventory = torch.cat((equipped, inventory), 1)
+
+        if extract_equipped:
+            if self.state_space == (9,9):
+                assert extract_goal
+                assert extract_inv
+                equipped = state[:, :, 4, 4].clone().detach().long()
+            elif self.state_space == (2,4):
+                assert extract_goal
+                equipped = state[:, :,  0, 0].clone().detach().long()
+                state = state[:, :, :, 1:]
+                # print(state[0])
+                # print(equipped[0])
+
+
+
 
         return state, goals, inventory, equipped
 
-    def get_embeddings(self, goals):
+    def get_embeddings(self, goals,add_info=None):
 
         node_embeds = None
         goal_embeddings = None
+
+        #If add_info is not None, concatenate with goals during lookup
+        if not add_info is None and not goals is None:
+            goals = torch.cat((goals.unsqueeze(-1),add_info),axis=1)
+
 
         if self.mode in self.graph_modes:
 
@@ -350,7 +390,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             node_embeds = self.gcn.gcn_embed(embeds)
 
             if not goals is None:
-                goal_embeddings = node_embeds[[g.item() for g in goals]]
+                goal_embeddings = torch.index_select(node_embeds, 0,goals)
 
         elif self.mode == "cnn":
             node_embeds = self.embeds(self.object_list)  #Used for inventory
@@ -374,12 +414,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #If easy, change model and dont extract goal or inv
 
         state, goals, inventory, equipped = self.preprocess_state(state,
-                self.extract_goal, self.extract_inv)
+                self.extract_goal, self.extract_inv,self.extract_equipped)
 
-        node_embeds, goal_embeddings = self.get_embeddings(goals)
+        node_embeds, goal_embeddings = self.get_embeddings(goals,add_info=equipped)
 
         if self.mode != "cnn":
-            #if self.mode == "embed_bl":
             state_flat = state.reshape(-1)
             embedded_state = torch.index_select(node_embeds, 0,
                                                 state_flat).reshape(state.shape[0],
@@ -399,10 +438,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             cnn_output = torch.cat((cnn_output, inv_encoded), -1)
 
         if self.extract_goal:
-            # if self.mode not in ["skyline_hier_dw_noGCN", "skyline_hier_dw_noGCN_dynamic"]:
-            #        goal_embeddings = F.relu(goal_embeddings)
-            cnn_output = torch.cat((cnn_output, goal_embeddings), -1)
-
+            cnn_output = torch.cat((cnn_output, goal_embeddings.view(goal_embeddings.shape[0],-1)), -1)
+        
         q_value = self.head(cnn_output)
 
         return q_value
