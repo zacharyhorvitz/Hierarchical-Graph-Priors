@@ -46,6 +46,8 @@ np.random.seed(args.seed)
 
 run_tag = args.run_tag
 
+env_graph_data = None
+
 #env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address)
 if args.env == 'npy':
     env = EnvNpy(random=True, mission=None)
@@ -57,7 +59,7 @@ elif args.env == 'npy_easy_4task':
     env = EnvEasy4(random=True, mission=None)
     test_env = EnvEasy4(random=True, mission=None)
 elif args.env == 'npy_easy_gen':
-    env = EnvEasy_proc_gen(4, 4)
+    env = EnvEasy_proc_gen(8, 16)
     test_env = env #EnvEasy_proc_gen(random=True, mission=None)
 
 elif args.env == 'npy_easy_4task_mask':
@@ -148,7 +150,8 @@ agent_args = {
     "use_layers": args.use_layers,
     "converged_init": args.converged_init,
     "dist_path": args.dist_path,
-    "reverse_direction": args.reverse_direction
+    "reverse_direction": args.reverse_direction,
+    "env_graph_data":  env.generate_graph_info(args.mode in {"skyline_hier"},args.reverse_direction) if args.env == 'npy_easy_gen' else None
 }
 agent = DQN_agent(**agent_args)
 

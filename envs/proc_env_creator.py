@@ -16,6 +16,9 @@ class MalmoEnvSpecial(gym.Env):
         self.tools = all_objects[:num_tools]
         self.blocks = all_objects[num_tools:num_tools+num_blocks]
         self.drops = all_objects[num_tools+num_blocks:]
+        
+        self.num_game_nodes = len(all_objects)+2
+        self.all_objects = all_objects
 
         block_properties_dict = {}
         tool_dict = {t:[] for t in self.tools}
@@ -27,6 +30,74 @@ class MalmoEnvSpecial(gym.Env):
 
         self.tool_dict = tool_dict
         self.block_properties_dict = block_properties_dict
+
+    
+    def generate_graph_info(self,use_hier=False,reverse=False):
+        latent_nodes = [] if not use_hier else ["tool","block","drop"]
+        adjacency = np.zeros((self.num_game_nodes,self.num_game_nodes)) if not use_hier else np.zeros((self.num_game_nodes+len(latent_nodes),self.num_game_nodes+len(latent_nodes)))
+
+        for i in range(len(adjacency)):
+            adjacency[i][i] = 1.0
+
+        for b in self.blocks:
+            adjacency[b][self.block_properties_dict[b]["drop"]]=1.0
+            adjacency[self.block_properties_dict[b]["tool"]][b]=1.0
+
+        if use_hier:
+            for b in self.blocks:
+                adjacency[-1][self.block_properties_dict[b]["drop"]]=1.0
+                adjacency[-2][b]=1.0
+
+            for t in self.tools:
+                adjacency[-3][t]=1.0
+
+        
+        node_to_name = {0:"air",1:"player",self.num_game_nodes:"tool",self.num_game_nodes+1:"block",self.num_game_nodes+2:"drop"}
+
+        for o in self.all_objects:
+            if o in self.tools:
+             node_to_name[o] = str(o)+"_tool"
+
+            elif o in self.blocks:
+             node_to_name[o] = str(o)+"_block"
+
+            elif o in self.drops:
+             node_to_name[o] = str(o)+"_drop"
+
+        node_to_game = {i:i for i in range(self.num_game_nodes)}
+
+        edges = []
+
+        for i in range(len(adjacency)):
+            for j in range(len(adjacency)):
+                if adjacency[i][j] == 1:
+                    edges.append((node_to_name[i],node_to_name[j]))
+
+        if not reverse:
+            adjacency = np.transpose(adjacency)
+
+        object_to_char = {v:k for k,v in node_to_name.items() if k in node_to_game}
+
+
+        graph_dict = {}
+        graph_dict["num_nodes"] = self.num_game_nodes+len(latent_nodes)
+        graph_dict["node_to_name"] = node_to_name
+        graph_dict["node_to_game"] = node_to_game
+        graph_dict["adjacency"] = adjacency
+        graph_dict["edges"] = edges
+        graph_dict["latent_nodes"] = latent_nodes
+        graph_dict["object_to_char"] = object_to_char
+
+        return graph_dict
+
+
+
+
+
+
+
+
+
 
 
     def init_map(self, block):

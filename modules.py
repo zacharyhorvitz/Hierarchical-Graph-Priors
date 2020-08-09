@@ -170,7 +170,7 @@ def self_attention(K, V, Q):
     return build_new_embeds
 
 
-def malmo_build_gcn_param(object_to_char, mode, hier, use_layers, reverse_direction, multi_edge):
+def malmo_build_gcn_param(object_to_char,mode, hier, use_layers, reverse_direction, multi_edge):
 
     # self.object_to_char = object_to_char
 

@@ -41,7 +41,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         reverse_direction=False,
         converged_init=None,
         dist_path=None,
-        use_layers=3):
+        use_layers=3,
+        env_graph_data=None):
         """Defining DQN CNN model
         """
         # initialize all parameters
@@ -55,6 +56,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.num_actions = num_actions
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
+        self.env_graph_data = env_graph_data
         if isinstance(state_space, Space):
             self.input_shape = state_space.shape
         else:
@@ -93,34 +95,34 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "skyline_nogcn"
         }
 
+        if self.env_graph_data is None:
+            self.object_to_char = {
+                "air": 0,
+                "wall": 1,
+                "stone": 2,
+                "pickaxe_item": 3,
+                "cobblestone_item": 4,
+                "log": 5,
+                "axe_item": 6,
+                "dirt": 7,
+                "farmland": 8,
+                "hoe_item": 9,
+                "water": 10,
+                "bucket_item": 11,
+                "water_bucket_item": 12,
+                "log_item": 13,
+                "dirt_item": 14,
+                "farmland_item": 15
+                }
+        else:
+            self.object_to_char = self.env_graph_data["object_to_char"]
+
+
         self.build_model()
-
-    def build_env_info(self):
-
-        object_to_char = {
-            "air": 0,
-            "wall": 1,
-            "stone": 2,
-            "pickaxe_item": 3,
-            "cobblestone_item": 4,
-            "log": 5,
-            "axe_item": 6,
-            "dirt": 7,
-            "farmland": 8,
-            "hoe_item": 9,
-            "water": 10,
-            "bucket_item": 11,
-            "water_bucket_item": 12,
-            "log_item": 13,
-            "dirt_item": 14,
-            "farmland_item": 15
-        }
-
-        self.object_to_char = object_to_char
 
     def build_model(self):
 
-        self.build_env_info()  #define env mapping
+        # self.build_env_info()  #define env mapping
 
         # if self.mode == 'skyline_hier_dw_noGCN_dynamic':
         #     self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"), dtype=torch.float, requires_grad=True).to(self.device)
@@ -188,13 +190,23 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             raise ValueError("Unexpected state space {}".format(self.state_space))
 
         if self.mode in self.graph_modes or self.mode in self.no_gcn_graph_models:
-            num_nodes, node_to_name, node_to_game, adjacency, edges, latent_nodes = malmo_build_gcn_param(
-                                                                            self.object_to_char,
-                                                                            self.mode,
-                                                                            self.hier,
-                                                                            self.use_layers,
-                                                                            self.reverse_direction,
-                                                                            self.multi_edge)
+            if self.env_graph_data is None:
+                print("No graph data specified...loading default")
+                num_nodes, node_to_name, node_to_game, adjacency, edges, latent_nodes = malmo_build_gcn_param(
+                                                                                self.object_to_char,
+                                                                                self.mode,
+                                                                                self.hier,
+                                                                                self.use_layers,
+                                                                                self.reverse_direction,
+                                                                                self.multi_edge)
+            else:
+                num_nodes=self.env_graph_data["num_nodes"]
+                node_to_name=self.env_graph_data["node_to_name"]
+                node_to_game=self.env_graph_data["node_to_game"]
+                adjacency=torch.FloatTensor(self.env_graph_data["adjacency"]).unsqueeze(0).to(self.device)
+                edges = self.env_graph_data["edges"]
+                latent_nodes = self.env_graph_data["latent_nodes"]
+
 
             self.node_to_game_char = node_to_game
             self.node_to_name = node_to_name
@@ -390,7 +402,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             node_embeds = self.gcn.gcn_embed(embeds)
 
             if not goals is None:
-                goal_embeddings = torch.index_select(node_embeds, 0,goals)
+                goal_embeddings = torch.index_select(node_embeds, 0,goals.view(-1))
+                goal_embeddings = goal_embeddings.view(goals.shape[0],goals.shape[1],-1)
 
         elif self.mode == "cnn":
             node_embeds = self.embeds(self.object_list)  #Used for inventory
@@ -494,7 +507,8 @@ class DQN_agent:
                  use_layers=3,
                  converged_init=None,
                  dist_path=None,
-                 reverse_direction=False):
+                 reverse_direction=False,
+                 env_graph_data=None):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
@@ -526,7 +540,8 @@ class DQN_agent:
                                               dist_path=dist_path,
                                               converged_init=converged_init,
                                               self_attention=self_attention,
-                                              one_layer=one_layer)
+                                              one_layer=one_layer,
+                                              env_graph_data=env_graph_data)
 
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
@@ -547,7 +562,9 @@ class DQN_agent:
                                               dist_path=dist_path,
                                               converged_init=converged_init,
                                               self_attention=self_attention,
-                                              one_layer=one_layer)
+                                              one_layer=one_layer,
+                                              env_graph_data=env_graph_data)
+
 
         else:
             raise NotImplementedError(model_type)
