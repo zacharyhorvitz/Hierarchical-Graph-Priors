@@ -23,8 +23,21 @@ class MalmoEnvSpecial(gym.Env):
         block_properties_dict = {}
         tool_dict = {t:[] for t in self.tools}
 
-        for b,d in zip(self.blocks,self.drops):
-            tool_choice = random.choice(self.tools)
+        assert num_blocks % num_tools == 0
+
+        tools_to_assign = []
+
+        for tool_to_blocks in range(num_blocks // num_tools):
+            tools_to_assign.append(self.tools)
+
+        tools_to_assign = np.concatenate(tools_to_assign)
+        np.random.shuffle(tools_to_assign)
+
+        assert len(tools_to_assign) == len(self.drops)
+        assert len(self.drops) == len(self.blocks)
+
+        for b,d, t in zip(self.blocks,self.drops,tools_to_assign):
+            tool_choice = t
             block_properties_dict[b] = {"drop":d,"tool":tool_choice}
             tool_dict[tool_choice].append(b)
 
@@ -77,6 +90,7 @@ class MalmoEnvSpecial(gym.Env):
             adjacency = np.transpose(adjacency)
 
         object_to_char = {v:k for k,v in node_to_name.items() if k in node_to_game}
+        print(edges)
 
 
         graph_dict = {}

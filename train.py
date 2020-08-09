@@ -59,7 +59,7 @@ elif args.env == 'npy_easy_4task':
     env = EnvEasy4(random=True, mission=None)
     test_env = EnvEasy4(random=True, mission=None)
 elif args.env == 'npy_easy_gen':
-    env = EnvEasy_proc_gen(8, 16)
+    env = EnvEasy_proc_gen(1,4)
     test_env = env #EnvEasy_proc_gen(random=True, mission=None)
 
 elif args.env == 'npy_easy_4task_mask':
