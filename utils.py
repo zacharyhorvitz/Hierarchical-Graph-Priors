@@ -15,6 +15,14 @@ def parse_args():
                         type=str,
                         default='npy',
                         required=True)
+    parser.add_argument('--procgen-tools',
+                        help='Tools for procgen',
+                        type=int,
+                        default=1)
+    parser.add_argument('--procgen-blocks',
+                        help='Blocks for procgen',
+                        type=int,
+                        default=2)
     parser.add_argument('--run-tag', help='Tag to identify experiment', type=str, required=True)
     parser.add_argument('--address', help='ip address', type=str, required=False)
     parser.add_argument('--port', help='Port', type=int, required=False)
