@@ -24,6 +24,12 @@ def parse_args():
                         default='cnn',
                         choices=["cnn", "dueling"],
                         required=False)
+    parser.add_argument('--model-size',
+                        help="Size of architecture",
+                        type=str,
+                        default='small',
+                        choices=["small", "large"],
+                        required=False)
     parser.add_argument('--model-path',
                         help='The path to the save the pytorch model',
                         type=str,
@@ -136,9 +142,17 @@ def parse_args():
                         type=int,
                         default=10,
                         required=False)
-    parser.add_argument('--use-hier', help='Use latent nodes', action='store_true', required=False)
-    parser.add_argument('--mode', help='select mode', required=True)
-    parser.add_argument('--atten', help='Use block attention', action='store_true', required=False)
+    parser.add_argument('--use-hier',
+                        help='Use latent nodes',
+                        action='store_true',
+                        required=False)
+    parser.add_argument('--mode', 
+                        help='select mode',
+                        required=True)
+    parser.add_argument('--atten', 
+                        help='Use block attention',
+                        action='store_true',
+                        required=False)
     parser.add_argument('--one_layer',
                         help='just compute attention over neighbors',
                         action='store_true',
@@ -147,6 +161,11 @@ def parse_args():
                         help='size of node embeddings',
                         type=int,
                         default=16,
+                        required=False)
+    parser.add_argument('--final-dense-layer',
+                        help='size of final dense layers',
+                        type=int,
+                        default=50,
                         required=False)
     parser.add_argument('--multi_edge',
                         help='specify single edge or multi edge',
@@ -176,7 +195,6 @@ def parse_args():
                         help='specify whether self attention applied to node embeddings',
                         action='store_true',
                         required=False)
-
     parser.add_argument('--use_layers',
                         help='number of GCN layers',
                         type=int,
@@ -196,7 +214,6 @@ def parse_args():
                         type=str,
                         default="dist_data",
                         required=False)
-
     parser.add_argument('--converged_init',
                         help='path to saved embeddings',
                         type=str,

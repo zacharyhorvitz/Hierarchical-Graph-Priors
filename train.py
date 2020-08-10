@@ -142,6 +142,8 @@ agent_args = {
     "emb_size": args.emb_size,
     "one_layer": args.one_layer,
     "multi_edge": args.multi_edge,
+    "model_size": args.model_size,
+    "final_dense_layer": args.final_dense_layer,
     "aux_dist_loss_coeff": args.aux_dist_loss_coeff,
     "contrastive_loss_coeff": args.contrastive_loss_coeff,
     "positive_margin": args.positive_margin,

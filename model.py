@@ -29,7 +29,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         positive_margin,
         negative_margin,
         num_frames=1,
-        final_dense_layer=50,
+        model_size="small",
+        final_dense_layer=100,
         #input_shape=(9, 9),
         mode="skyline",  #skyline,ling_prior,embed_bl,cnn
         hier=False,
@@ -57,7 +58,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
         self.env_graph_data = env_graph_data
-        self.model_size = "lg"
+        self.model_size = model_size
         if isinstance(state_space, Space):
             self.input_shape = state_space.shape
         else:
@@ -88,13 +89,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             "fully_connected",
             "skyline_hier_multi",
             "skyline_hier_multi_atten",
-            
         }
 
-        self.no_gcn_graph_models = {
-           "skyline_hier_nogcn",
-            "skyline_nogcn"
-        }
+        self.no_gcn_graph_models = {"skyline_hier_nogcn", "skyline_nogcn"}
 
         if self.env_graph_data is None:
             self.object_to_char = {
@@ -114,22 +111,14 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 "log_item": 13,
                 "dirt_item": 14,
                 "farmland_item": 15
-                }
+            }
         else:
             self.object_to_char = self.env_graph_data["object_to_char"]
-
 
         self.build_model()
 
     def build_model(self):
-
-        # self.build_env_info()  #define env mapping
-
-        # if self.mode == 'skyline_hier_dw_noGCN_dynamic':
-        #     self.node_embeds_from_dw = torch.tensor(np.load("sky_hier_embeddings_written_8.npy"), dtype=torch.float, requires_grad=True).to(self.device)
-        # elif self.mode == 'skyline_hier_dw_noGCN': #default title is static deepwalk embeddings
-        #     self.node_embeds_from_dw = torch.FloatTensor(np.load("sky_hier_embeddings_written_8.npy")).to(self.device)
-
+        print("Using model_size:", self.model_size)
         if self.state_space == (9, 9):
 
             self.extract_goal, self.extract_inv = True, True
@@ -170,7 +159,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
 
-        elif self.state_space == (2, 4) and self.model_size == "lg":
+        elif self.state_space == (2, 4) and self.model_size == "large":
 
             self.extract_goal, self.extract_inv = True, False
             self.extract_equipped = True
@@ -179,21 +168,30 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
             self.body = torch.nn.Sequential(*[
             torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 32, kernel_size=(2, 2), stride=1), #8
-            torch.nn.ReLU(),
-            torch.nn.Conv2d(32, 32, kernel_size=(2, 2), stride=1), #8
             torch.nn.ReLU()
             ])
 
             final_size = conv2d_size_out(self.input_shape, (2, 2), 1)
-            final_size = conv2d_size_out(final_size, (2, 2), 1)
+            input_size = final_size[0] * final_size[1] * 32
+
+            if self.extract_goal:
+                input_size += self.emb_size
+
+            if self.extract_equipped:
+                input_size += self.emb_size
+
+            if self.extract_inv:
+                input_size += self.emb_size
 
             self.head = torch.nn.Sequential(*[
-                torch.nn.Linear(final_size*32, self.final_dense_layer),
+                torch.nn.Linear(input_size, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.final_dense_layer),
                 torch.nn.ReLU(),
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
 
-        elif self.state_space == (2, 4):
+        elif self.state_space == (2, 4) and self.model_size == "small":
 
             self.extract_goal, self.extract_inv = True, False
             self.extract_equipped = True
@@ -203,12 +201,23 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             torch.nn.ReLU()
             ])
 
+            final_size = conv2d_size_out(self.input_shape, (2, 2), 1)
+            input_size = final_size[0] * final_size[1] * 8
+
+            if self.extract_goal:
+                input_size += self.emb_size
+
+            if self.extract_equipped:
+                input_size += self.emb_size
+
+            if self.extract_inv:
+                input_size += self.emb_size
+
             self.head = torch.nn.Sequential(*[
-                torch.nn.Linear(8 * 3+2*self.emb_size, self.final_dense_layer),
+                torch.nn.Linear(input_size, self.final_dense_layer),
                 torch.nn.ReLU(),
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
-
 
         else:
             raise ValueError("Unexpected state space {}".format(self.state_space))
@@ -224,13 +233,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                                                                                 self.reverse_direction,
                                                                                 self.multi_edge)
             else:
-                num_nodes=self.env_graph_data["num_nodes"]
-                node_to_name=self.env_graph_data["node_to_name"]
-                node_to_game=self.env_graph_data["node_to_game"]
-                adjacency=torch.FloatTensor(self.env_graph_data["adjacency"]).unsqueeze(0).to(self.device)
+                num_nodes = self.env_graph_data["num_nodes"]
+                node_to_name = self.env_graph_data["node_to_name"]
+                node_to_game = self.env_graph_data["node_to_game"]
+                adjacency = torch.FloatTensor(self.env_graph_data["adjacency"]).unsqueeze(0).to(
+                    self.device)
                 edges = self.env_graph_data["edges"]
                 latent_nodes = self.env_graph_data["latent_nodes"]
-
 
             self.node_to_game_char = node_to_game
             self.node_to_name = node_to_name
@@ -389,36 +398,32 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         if extract_inv:
             inventory = state[:, :, :, 0].clone().squeeze(1).detach().long()
-            state = state[:, :, :, 1:] #.long()
+            state = state[:, :, :, 1:]  #.long()
 
             # inventory = torch.cat((equipped, inventory), 1)
 
         if extract_equipped:
-            if self.state_space == (9,9):
+            if self.state_space == (9, 9):
                 assert extract_goal
                 assert extract_inv
                 equipped = state[:, :, 4, 4].clone().detach().long()
-            elif self.state_space == (2,4):
+            elif self.state_space == (2, 4):
                 assert extract_goal
-                equipped = state[:, :,  0, 0].clone().detach().long()
+                equipped = state[:, :, 0, 0].clone().detach().long()
                 state = state[:, :, :, 1:]
                 # print(state[0])
                 # print(equipped[0])
 
-
-
-
         return state, goals, inventory, equipped
 
-    def get_embeddings(self, goals,add_info=None):
+    def get_embeddings(self, goals, add_info=None):
 
         node_embeds = None
         goal_embeddings = None
 
         #If add_info is not None, concatenate with goals during lookup
         if not add_info is None and not goals is None:
-            goals = torch.cat((goals.unsqueeze(-1),add_info),axis=1)
-
+            goals = torch.cat((goals.unsqueeze(-1), add_info), axis=1)
 
         if self.mode in self.graph_modes:
 
@@ -426,8 +431,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             node_embeds = self.gcn.gcn_embed(embeds)
 
             if not goals is None:
-                goal_embeddings = torch.index_select(node_embeds, 0,goals.view(-1))
-                goal_embeddings = goal_embeddings.view(goals.shape[0],goals.shape[1],-1)
+                goal_embeddings = torch.index_select(node_embeds, 0, goals.view(-1))
+                goal_embeddings = goal_embeddings.view(goals.shape[0], goals.shape[1], -1)
 
         elif self.mode == "cnn":
             node_embeds = self.embeds(self.object_list)  #Used for inventory
@@ -453,7 +458,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         state, goals, inventory, equipped = self.preprocess_state(state,
                 self.extract_goal, self.extract_inv,self.extract_equipped)
 
-        node_embeds, goal_embeddings = self.get_embeddings(goals,add_info=equipped)
+        node_embeds, goal_embeddings = self.get_embeddings(goals, add_info=equipped)
 
         if self.mode != "cnn":
             state_flat = state.reshape(-1)
@@ -474,9 +479,10 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             inv_encoded = self.inv_block(inventory, node_embeds, goal_embeddings)
             cnn_output = torch.cat((cnn_output, inv_encoded), -1)
 
-        if self.extract_goal:
-            cnn_output = torch.cat((cnn_output, goal_embeddings.view(goal_embeddings.shape[0],-1)), -1)
-        
+        if self.extract_goal: # TODO rename to reflect that this is goal + other stuff
+            cnn_output = torch.cat((cnn_output, goal_embeddings.view(goal_embeddings.shape[0], -1)),
+                                   -1)
+
         q_value = self.head(cnn_output)
 
         return q_value
@@ -519,7 +525,9 @@ class DQN_agent:
                  contrastive_loss_coeff,
                  positive_margin,
                  negative_margin,
+                 final_dense_layer=50,
                  model_type="mlp",
+                 model_size="small",
                  num_frames=None,
                  mode="skyline",
                  hier=False,
@@ -554,6 +562,8 @@ class DQN_agent:
                                               negative_margin=negative_margin,
                                               positive_margin=positive_margin,
                                               num_frames=num_frames,
+                                              final_dense_layer=final_dense_layer,
+                                              model_size=model_size,
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
@@ -576,6 +586,8 @@ class DQN_agent:
                                               negative_margin=negative_margin,
                                               positive_margin=positive_margin,
                                               num_frames=num_frames,
+                                              model_size=model_size,
+                                              final_dense_layer=final_dense_layer,
                                               mode=mode,
                                               hier=hier,
                                               atten=atten,
@@ -588,7 +600,6 @@ class DQN_agent:
                                               self_attention=self_attention,
                                               one_layer=one_layer,
                                               env_graph_data=env_graph_data)
-
 
         else:
             raise NotImplementedError(model_type)
