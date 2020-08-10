@@ -57,6 +57,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.num_frames = num_frames
         self.final_dense_layer = final_dense_layer
         self.env_graph_data = env_graph_data
+        self.model_size = "lg"
         if isinstance(state_space, Space):
             self.input_shape = state_space.shape
         else:
@@ -165,6 +166,29 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
             self.head = torch.nn.Sequential(*[
                 torch.nn.Linear(8 * 2, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.num_actions)
+            ])
+
+        elif self.state_space == (2, 4) and self.model_size == "lg":
+
+            self.extract_goal, self.extract_inv = True, False
+            self.extract_equipped = True
+
+            #embd = 32
+
+            self.body = torch.nn.Sequential(*[
+            torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 32, kernel_size=(2, 2), stride=1), #8
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(32, 32, kernel_size=(2, 2), stride=1), #8
+            torch.nn.ReLU()
+            ])
+
+            final_size = conv2d_size_out(self.input_shape, (2, 2), 1)
+            final_size = conv2d_size_out(final_size, (2, 2), 1)
+
+            self.head = torch.nn.Sequential(*[
+                torch.nn.Linear(final_size*32, self.final_dense_layer),
                 torch.nn.ReLU(),
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])

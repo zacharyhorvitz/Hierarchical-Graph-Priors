@@ -2,13 +2,27 @@
 # import re
 # import spacy
 from openie import StanfordOpenIE
+from collections import Counter
 
 def process_text(text,name):
+
+    top_relations = []
+    triples = []
 
     with StanfordOpenIE() as client:
         print('Text: %s.' % text)
         for triple in client.annotate(text):
-            print('|-', triple)
+            # print('|-', triple)
+            top_relations.append(triple['relation'])
+            triples.append(triple)
+
+        #terms = set([w for w,_ in Counter(top_relations).most_common(15) if not w in {'is','are','is in','consists of','has','have','controls','is with', 'is represented by','is partially protected by'}])
+
+        for t in triples:
+            for term in ["hit","shoot","grab","catch","use","blow","destroy","touch","avoid","collide"]:
+                if term in t['relation']: # in terms:
+                    print(t)
+                    break
 
         graph_image = name+'_graph.png'
         client.generate_graphviz_graph(text, graph_image)
