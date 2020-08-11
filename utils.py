@@ -234,6 +234,11 @@ def parse_args():
                         default=None,
                         required=False)
 
+    parser.add_argument('--disconnect_graph',
+                        help='replace adjacency matrix with disconnected graph',
+                        default=False,
+                        required=False)
+
     return parser.parse_args()
 
 

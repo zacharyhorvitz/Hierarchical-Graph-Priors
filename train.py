@@ -153,7 +153,8 @@ agent_args = {
     "converged_init": args.converged_init,
     "dist_path": args.dist_path,
     "reverse_direction": args.reverse_direction,
-    "env_graph_data":  env.generate_graph_info(args.mode in {"skyline_hier"},args.reverse_direction) if args.env == 'npy_easy_gen' else None
+    "env_graph_data":  env.generate_graph_info(args.mode in {"skyline_hier"},args.reverse_direction) if args.env == 'npy_easy_gen' else None,
+    "disconnect_graph": args.disconnect_graph
 }
 agent = DQN_agent(**agent_args)
 

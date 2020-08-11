@@ -43,7 +43,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         converged_init=None,
         dist_path=None,
         use_layers=3,
-        env_graph_data=None):
+        env_graph_data=None,
+        disconnect_graph=False):
         """Defining DQN CNN model
         """
         # initialize all parameters
@@ -56,6 +57,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.device = device
         self.num_actions = num_actions
         self.num_frames = num_frames
+        self.disconnect_graph = disconnect_graph
         self.final_dense_layer = final_dense_layer
         self.env_graph_data = env_graph_data
         self.model_size = model_size
@@ -245,6 +247,11 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.node_to_name = node_to_name
             self.name_to_node = {v: k for k, v in self.node_to_name.items()}
             self.adjacency = adjacency
+
+            if self.disconnect_graph:
+                print("DISCONNECTING GRAPH")
+                self.adjacency = torch.eye(self.adjacency.shape[0]).unsqueeze(0).to(
+                    self.device)
 
             self.edges = edges
             self.latent_nodes = latent_nodes
@@ -540,7 +547,8 @@ class DQN_agent:
                  converged_init=None,
                  dist_path=None,
                  reverse_direction=False,
-                 env_graph_data=None):
+                 env_graph_data=None,
+                 disconnect_graph=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
@@ -575,7 +583,8 @@ class DQN_agent:
                                               converged_init=converged_init,
                                               self_attention=self_attention,
                                               one_layer=one_layer,
-                                              env_graph_data=env_graph_data)
+                                              env_graph_data=env_graph_data,
+                                              disconnect_graph=disconnect_graph)
 
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
@@ -599,7 +608,9 @@ class DQN_agent:
                                               converged_init=converged_init,
                                               self_attention=self_attention,
                                               one_layer=one_layer,
-                                              env_graph_data=env_graph_data)
+                                              env_graph_data=env_graph_data,
+                                            disconnect_graph=disconnect_graph)
+
 
         else:
             raise NotImplementedError(model_type)
