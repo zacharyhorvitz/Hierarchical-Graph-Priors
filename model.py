@@ -260,7 +260,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             if self.contrastive_loss_coeff != 0:
                 # NOTE does not support multiple edge types
                 # NOTE adjacency is transposed, we're undoing it
-                self.untransposed_adjacency = adjacency[0].transpose(0, 1).to(self.device)
+                self.untransposed_adjacency = adjacency[0].transpose(0, 1).to(self.device).to(
+                    torch.uint8)
                 self.contrastive_mask = torch.zeros_like(self.untransposed_adjacency,
                                                          dtype=torch.uint8)
                 self.contrastive_mask[self.latent_node_idx, :] = 1
