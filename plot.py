@@ -47,6 +47,7 @@ def collate_results(results_dirs, filename, bin_size, window_size):
 def plot(data, x, y, hue, style, seed, savepath=None, show=True):
     print("Plotting using hue={hue}, style={style}, {seed}".format(hue=hue, style=style, seed=seed))
     assert not data.empty, "DataFrame is empty, please check query"
+
     # If asking for multiple envs, use facetgrid and adjust height
     height = 3 if len(data['env'].unique()) > 2 else 5
     col_wrap = 2 if len(data['env'].unique()) > 1 else 1
@@ -100,12 +101,12 @@ def parse_args():
 
     # yapf: disable
     parser.add_argument('--results-dirs', help='Directories for results', required=True, nargs='+', type=str)
-    parser.add_argument('--filename', help='CSV filename', required=False, type=str)
+    parser.add_argument('--filename', help='CSV filename', required=False, type=str, default='reward.csv')
     parser.add_argument('--bin-size', help='How much to reduce the data by', type=int, default=10)
     parser.add_argument('--window-size', help='How much to average the data by', type=int, default=10)
 
-    parser.add_argument('-x', help='Variable to plot on x axis', required=False, type=str)
-    parser.add_argument('-y', help='Variable to plot on y axis', required=False, type=str)
+    parser.add_argument('-x', help='Variable to plot on x axis', required=False, type=str, default='steps')
+    parser.add_argument('-y', help='Variable to plot on y axis', required=False, type=str, default='reward')
 
     parser.add_argument('--query', help='DF query string', type=str)
     parser.add_argument('--hue', help='Hue variable', type=str)
@@ -128,7 +129,9 @@ if __name__ == "__main__":
                                                                      bin_size=args.bin_size))
     assert args.filename is not None, "Must pass filename if creating csv"
     df = collate_results(args.results_dirs, args.filename, args.bin_size, args.window_size)
-
+    df = df.convert_dtypes(convert_string=False, convert_integer=False)
+    bool_cols = df.dtypes[df.dtypes == 'boolean'].index
+    df = df.replace(to_replace={k:pd.NA for k in bool_cols}, value={k:False for k in bool_cols})
     if not args.no_plot:
         assert args.x is not None and args.y is not None, "Must pass x, y if creating csv"
         if args.savepath:
