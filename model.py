@@ -249,6 +249,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.node_to_name = node_to_name
             self.name_to_node = {v: k for k, v in self.node_to_name.items()}
             self.adjacency = adjacency
+            self.undirect_adj = torch.FloatTensor(np.logical_or(self.adjacency.numpy(),self.adjacency.numpy().transpose(0,2,1))[0].astype(float))
+            print(self.undirect_adj,torch.sum(self.undirect_adj,-1))
+            self.undirect_adj.to(self.device)
 
             if self.disconnect_graph:
                 print("DISCONNECTING GRAPH")
@@ -294,21 +297,25 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.inv_block = LINEAR_INV_BLOCK(self.emb_size, self.emb_size, n=5)
 
         if self.aux_dist_loss_coeff != 0:
-            assert self.dist_path is not None
-            print("Loading distances from...", self.dist_path)
-            sim_matrix = np.load(self.dist_path + "/good_avg_matrix.npy")
-            sim_keys = np.load(self.dist_path + "/good_avg_keys.npy")
-            sim_keys = np.where(sim_keys == "player", "wall", sim_keys)
-            self.goal_dist = torch.zeros(len(self.embeds.weight), len(self.embeds.weight))
-            print(sim_matrix.shape)
-            print(self.goal_dist.shape)
-            for x in range(sim_matrix.shape[0]):
-                for y in range(sim_matrix.shape[1]):
-                    first_node = self.object_to_char[sim_keys[x]]
-                    second_node = self.object_to_char[sim_keys[y]]
-                    self.goal_dist[first_node][second_node] = sim_matrix[x][y]
-            #self.goal_dist += (0.1**0.5)*torch.randn(self.goal_dist.shape)
-            self.goal_dist.cuda()  # to(self.device)
+
+            if self.dist_path is not None:
+                # assert self.dist_path is not None
+                print("Loading distances from...", self.dist_path)
+                sim_matrix = np.load(self.dist_path + "/good_avg_matrix.npy")
+                sim_keys = np.load(self.dist_path + "/good_avg_keys.npy")
+                sim_keys = np.where(sim_keys == "player", "wall", sim_keys)
+                self.goal_dist = torch.zeros(len(self.embeds.weight), len(self.embeds.weight))
+                print(sim_matrix.shape)
+                print(self.goal_dist.shape)
+                for x in range(sim_matrix.shape[0]):
+                    for y in range(sim_matrix.shape[1]):
+                        first_node = self.object_to_char[sim_keys[x]]
+                        second_node = self.object_to_char[sim_keys[y]]
+                        self.goal_dist[first_node][second_node] = sim_matrix[x][y]
+                #self.goal_dist += (0.1**0.5)*torch.randn(self.goal_dist.shape)
+                self.goal_dist.cuda()  # to(self.device)
+            else:
+                print("Aux loss is using undirected adjacency loss MSE(u*v,Auv or Avu) ")
             self.build_pairs()
             self.pairwise = torch.nn.PairwiseDistance(p=2)
             self.pairwise_loss = torch.nn.MSELoss()
@@ -362,7 +369,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                     continue
                 seen.add(str(sorted([n, m])))
                 pairs.append([n, m])
-        self.pairs = torch.tensor([list(x) for x in pairs]).cuda()  # .to(self.device)
+        self.pairs = torch.tensor([list(x) for x in pairs]).to(self.device)
 
     def embed_pairs(self):
         pairs = self.embeds(self.pairs)
@@ -372,14 +379,27 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
     def get_true_dist(self):
         #TODO: load embedding distance in model init, fix alignment with keys, matrix
-
         dist = self.goal_dist[self.pairs[:, 0], self.pairs[:, 1]]
         dist = dist / torch.mean(dist)
 
         return dist
 
+
+      
+    def undirected_embed_loss(self):
+
+        pairs = self.embeds(self.pairs)
+        dot_products = torch.sum(pairs[:, 0] * pairs[:, 1],-1)
+        goals = self.undirect_adj[self.pairs[:, 0], self.pairs[:, 1]]
+        return self.pairwise_loss(dot_products,goals)
+
+
     def get_pairwise_loss(self):
-        return self.pairwise_loss(self.embed_pairs(), self.get_true_dist().cuda())
+        if self.dist_path is not None:
+            return self.pairwise_loss(self.embed_pairs(), self.get_true_dist().cuda())
+        else:
+            return self.undirected_embed_loss()
+
 
     def contrastive_loss_func(self, positive_margin, negative_margin):
 
@@ -633,6 +653,8 @@ class DQN_agent:
         self.warmup_period = warmup_period
         self.device = device
 
+
+
         self.model_type = model_type
         self.double_DQN = double_DQN
 
@@ -685,7 +707,6 @@ class DQN_agent:
 
         if self.aux_dist_loss_coeff != 0:
             aux_dist_loss = self.online.get_pairwise_loss()
-
             if writer:
                 writer.add_scalar('training/aux_dist_loss', aux_dist_loss, writer_step)
 
