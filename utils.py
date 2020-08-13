@@ -239,6 +239,14 @@ def parse_args():
                         action="store_true",
                         required=False)
 
+    parser.add_argument('--gcn_activation',
+                        help='gcn activation relu/tanh',
+                        type=str,
+                        default="relu",
+                        required=False)
+
+
+
     return parser.parse_args()
 
 

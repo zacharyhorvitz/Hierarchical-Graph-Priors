@@ -5,6 +5,8 @@ import random
 from collections import deque, namedtuple
 import torch.nn.functional as F
 from torch.nn.functional import relu
+from torch.nn.functional import tanh
+
 
 from utils import sync_networks, conv2d_size_out
 
@@ -18,13 +20,29 @@ class GCN(torch.nn.Module):
                  idx_2_game_char,
                  atten=False,
                  emb_size=16,
-                 use_layers=3):
+                 use_layers=3,
+                 activation="relu"):
         super(GCN, self).__init__()
 
         print("starting init")
 
         self.n = num_nodes
         self.emb_sz = emb_size
+        
+        if activation == "relu":
+            self.activation = relu
+        elif activation == "tanh":
+            self.activation = tanh
+        else:
+            print("Bad activation:",self.activation)
+            exit()
+
+        print("Using activation:", self.activation)
+
+
+
+
+
 
         self.atten = atten
         # self.nodes = torch.arange(0, self.n)
@@ -77,7 +95,7 @@ class GCN(torch.nn.Module):
                     weighting = F.normalize(self.A[e].float())
                 layer_out.append(torch.mm(weighting, x))  #)
             x = torch.cat([
-                relu(self.weights[e][l](type_features)) for e,
+                self.activation(self.weights[e][l](type_features)) for e,
                 type_features in enumerate(layer_out)
             ],
                           axis=1)
