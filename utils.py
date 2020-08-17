@@ -36,7 +36,7 @@ def parse_args():
                         help="Size of architecture",
                         type=str,
                         default='small',
-                        choices=["small", "large"],
+                        choices=["small", "large", "extra_large"],
                         required=False)
     parser.add_argument('--model-path',
                         help='The path to the save the pytorch model',
@@ -173,7 +173,7 @@ def parse_args():
     parser.add_argument('--final-dense-layer',
                         help='size of final dense layers',
                         type=int,
-                        default=50,
+                        default=300,
                         required=False)
     parser.add_argument('--multi_edge',
                         help='specify single edge or multi edge',

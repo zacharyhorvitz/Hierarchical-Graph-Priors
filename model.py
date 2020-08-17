@@ -163,6 +163,42 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 torch.nn.Linear(self.final_dense_layer, self.num_actions)
             ])
 
+        elif self.state_space == (2, 4) and self.model_size == "extra_large":
+
+            self.extract_goal, self.extract_inv = True, False
+            self.extract_equipped = True
+
+            #embd = 32
+
+            self.body = torch.nn.Sequential(*[
+            torch.nn.Conv2d(self.num_frames if self.mode != "cnn" else 1, 32, kernel_size=(2, 2), stride=1), #8
+            torch.nn.ReLU()
+            ])
+
+            final_size = conv2d_size_out(self.input_shape, (2, 2), 1)
+            input_size = final_size[0] * final_size[1] * 32
+
+            if self.extract_goal:
+                input_size += self.emb_size
+
+            if self.extract_equipped:
+                input_size += self.emb_size
+
+            if self.extract_inv:
+                input_size += self.emb_size
+
+            self.head = torch.nn.Sequential(*[
+                torch.nn.Linear(input_size, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.final_dense_layer),
+                torch.nn.ReLU(),
+                torch.nn.Linear(self.final_dense_layer, self.num_actions)
+            ])
+
         elif self.state_space == (2, 4) and self.model_size == "large":
 
             self.extract_goal, self.extract_inv = True, False
@@ -349,6 +385,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         #     self.embeds.weight.data.copy_(pre_init_embeds)
         #     self.embeds.requires_grad = True
 
+        print(self)
         trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Number of trainable parameters: {trainable_parameters}")
 
