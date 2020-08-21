@@ -155,7 +155,8 @@ agent_args = {
     "reverse_direction": args.reverse_direction,
     "env_graph_data":  env.generate_graph_info(args.mode in {"skyline_hier"},args.reverse_direction) if args.env == 'npy_easy_gen' else None,
     "disconnect_graph": args.disconnect_graph,
-    "gcn_activation": args.gcn_activation
+    "gcn_activation": args.gcn_activation,
+    "dw_init": args.dw_init
 
 
 }

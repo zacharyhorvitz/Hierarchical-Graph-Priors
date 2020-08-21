@@ -45,7 +45,8 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         use_layers=3,
         env_graph_data=None,
         disconnect_graph=False,
-        gcn_activation="relu"):
+        gcn_activation="relu",
+        dw_init=False):
         """Defining DQN CNN model
         """
         # initialize all parameters
@@ -62,6 +63,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.disconnect_graph = disconnect_graph
         self.final_dense_layer = final_dense_layer
         self.env_graph_data = env_graph_data
+        self.dw_init=dw_init
         self.model_size = model_size
         if isinstance(state_space, Space):
             self.input_shape = state_space.shape
@@ -377,6 +379,13 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
                 self.embeds.weight = torch.nn.Parameter(
                     checkpoint["model_state_dict"]['embeds.weight'])
             self.embeds.weight.requires_grad = True
+        elif self.dw_init:
+            print("USING DEEP WALK INIT")
+            assert self.env_graph_data is not None
+            self.embeds.weight = torch.nn.Parameter(torch.FloatTensor(self.env_graph_data["dw_embeds"]).to(self.device))
+            self.embeds.weight.requires_grad = True
+
+
 
         # pre_init_embeds = None
 
@@ -610,7 +619,8 @@ class DQN_agent:
                  reverse_direction=False,
                  env_graph_data=None,
                  disconnect_graph=False,
-                 gcn_activation="relu"):
+                 gcn_activation="relu",
+                 dw_init=False):
         """Defining DQN agent
         """
         self.replay_buffer = deque(maxlen=replay_buffer_size)
@@ -646,7 +656,7 @@ class DQN_agent:
                                               self_attention=self_attention,
                                               one_layer=one_layer,
                                               env_graph_data=env_graph_data,
-                                              disconnect_graph=disconnect_graph,gcn_activation=gcn_activation)
+                                              disconnect_graph=disconnect_graph,gcn_activation=gcn_activation,dw_init=dw_init)
 
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
@@ -671,7 +681,7 @@ class DQN_agent:
                                               self_attention=self_attention,
                                               one_layer=one_layer,
                                               env_graph_data=env_graph_data,
-                                            disconnect_graph=disconnect_graph,gcn_activation=gcn_activation)
+                                            disconnect_graph=disconnect_graph,gcn_activation=gcn_activation,dw_init=dw_init)
 
 
         else:

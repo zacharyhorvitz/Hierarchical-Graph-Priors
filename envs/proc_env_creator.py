@@ -3,6 +3,7 @@ import random
 import sys
 import gym
 from gym.spaces import Discrete
+from .run_deep_walk import run_dw
 
 
 class MalmoEnvSpecial(gym.Env):
@@ -80,20 +81,24 @@ class MalmoEnvSpecial(gym.Env):
         node_to_game = {i:i for i in range(self.num_game_nodes)}
 
         edges = []
-
+      
         for i in range(len(adjacency)):
             for j in range(len(adjacency)):
                 if adjacency[i][j] == 1:
                     edges.append((node_to_name[i],node_to_name[j]))
 
+
+        graph_dict = {}
+        graph_dict["dw_embeds"]  = run_dw(adjacency)
+
         if not reverse:
-            adjacency = np.transpose(adjacency)
+            adjacency = np.transpose(adjacency) #TRANSPOSES BY DEFAULT
 
         object_to_char = {v:k for k,v in node_to_name.items() if k in node_to_game}
         print(edges)
 
 
-        graph_dict = {}
+
         graph_dict["num_nodes"] = self.num_game_nodes+len(latent_nodes)
         graph_dict["node_to_name"] = node_to_name
         graph_dict["node_to_game"] = node_to_game

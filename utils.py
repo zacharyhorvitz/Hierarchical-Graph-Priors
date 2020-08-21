@@ -245,6 +245,11 @@ def parse_args():
                         default="relu",
                         required=False)
 
+    parser.add_argument('--dw_init',
+                        help='init using dw from env',
+                        action="store_true",
+                        required=False)
+
 
 
     return parser.parse_args()
