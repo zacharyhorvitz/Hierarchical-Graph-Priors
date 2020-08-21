@@ -3,7 +3,13 @@ import random
 import sys
 import gym
 from gym.spaces import Discrete
-from .run_deep_walk import run_dw
+import sys
+import os
+
+sys.path.insert(0,os.path.dirname(os.path.realpath(__file__)))
+
+from run_deep_walk import run_dw
+
 
 
 class MalmoEnvSpecial(gym.Env):
