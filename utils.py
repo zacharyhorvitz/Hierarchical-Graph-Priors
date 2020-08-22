@@ -1,242 +1,27 @@
+from datetime import datetime
+
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import torch
-import argparse
-from datetime import datetime
+import gym
+from atariari.benchmark.wrapper import AtariARIWrapper
 
+from gym_wrappers import SortedARIState
 
-def parse_args():
-    # Parse input arguments
-    # Use --help to see a pretty description of the arguments
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--env',
-                        help='The malmo environment to train on',
-                        type=str,
-                        default='npy',
-                        required=True)
-    parser.add_argument('--procgen-tools', help='Tools for procgen', type=int, default=1)
-    parser.add_argument('--procgen-blocks', help='Blocks for procgen', type=int, default=2)
-    parser.add_argument('--run-tag', help='Tag to identify experiment', type=str, required=True)
-    parser.add_argument('--address', help='ip address', type=str, required=False)
-    parser.add_argument('--port', help='Port', type=int, required=False)
-    parser.add_argument('--model-type',
-                        help="Type of architecture",
-                        type=str,
-                        default='cnn',
-                        choices=["cnn", "dueling"],
-                        required=False)
-    parser.add_argument('--model-size',
-                        help="Size of architecture",
-                        type=str,
-                        default='small',
-                        choices=["small", "large", "extra_large"],
-                        required=False)
-    parser.add_argument('--model-path',
-                        help='The path to the save the pytorch model',
-                        type=str,
-                        required=False)
-    parser.add_argument('--gamma', help='Gamma parameter', type=float, default=0.99, required=False)
-    parser.add_argument('--output-path',
-                        help='The output directory to store training stats',
-                        type=str,
-                        default="./logs",
-                        required=False)
-    parser.add_argument('--load-checkpoint-path',
-                        help='Path to checkpoint',
-                        type=str,
-                        required=False)
-    parser.add_argument('--no-tensorboard',
-                        help='No tensorboard logging',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--no-atari',
-                        help='Use atari preprocessing',
-                        action='store_false',
-                        required=False)
-    parser.add_argument('--gpu', help='Use the gpu or not', action='store_true', required=False)
-    parser.add_argument('--render',
-                        help='Render visual or not',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--render-episodes',
-                        help='Render every these many episodes',
-                        type=int,
-                        default=5,
-                        required=False)
-    parser.add_argument('--num-frames',
-                        help='Number of frames to stack (CNN only)',
-                        type=int,
-                        default=4,
-                        required=False)
-    parser.add_argument('--max-steps',
-                        help='Number of steps to run for',
-                        type=int,
-                        default=5000000,
-                        required=False)
-    parser.add_argument('--checkpoint-steps',
-                        help='Checkpoint every so often',
-                        type=int,
-                        default=50000,
-                        required=False)
-    parser.add_argument('--test-policy-steps',
-                        help='Policy is tested every these many steps',
-                        type=int,
-                        default=10000,
-                        required=False)
-    parser.add_argument('--num-test-runs',
-                        help='Number of times to test',
-                        type=int,
-                        default=50,
-                        required=False)
-    parser.add_argument('--warmup-period',
-                        help='Number of steps to act randomly and not train',
-                        type=int,
-                        default=250000,
-                        required=False)
-    parser.add_argument('--batchsize',
-                        help='Number of experiences sampled from replay buffer',
-                        type=int,
-                        default=32,
-                        required=False)
-    parser.add_argument('--gradient-clip',
-                        help='How much to clip the gradients by',
-                        type=float,
-                        default=2.5,
-                        required=False)
-    parser.add_argument('--reward-clip',
-                        help='How much to clip reward, clipped in [-rc, rc], 0 \
-                        results in unclipped',
-                        type=float,
-                        default=0,
-                        required=False)
-    parser.add_argument('--epsilon-decay',
-                        help='Parameter for epsilon decay',
-                        type=int,
-                        default=1000000,
-                        required=False)
-    parser.add_argument('--epsilon-decay-end',
-                        help='Parameter for epsilon decay end',
-                        type=int,
-                        default=0.05,
-                        required=False)
-    parser.add_argument('--replay-buffer-size',
-                        help='Max size of replay buffer',
-                        type=int,
-                        default=1000000,
-                        required=False)
-    parser.add_argument('--lr',
-                        help='Learning rate for the optimizer',
-                        type=float,
-                        default=2.5e-4,
-                        required=False)
-    parser.add_argument('--target-moving-average',
-                        help='EMA parameter for target network',
-                        type=float,
-                        default=5e-3,
-                        required=False)
-    parser.add_argument('--vanilla-DQN',
-                        help='Use the vanilla dqn update instead of double DQN',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--seed',
-                        help='The random seed for this run',
-                        type=int,
-                        default=10,
-                        required=False)
-    parser.add_argument('--use-hier', help='Use latent nodes', action='store_true', required=False)
-    parser.add_argument('--mode', help='select mode', required=True)
-    parser.add_argument('--atten', help='Use block attention', action='store_true', required=False)
-    parser.add_argument('--one_layer',
-                        help='just compute attention over neighbors',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--emb_size',
-                        help='size of node embeddings',
-                        type=int,
-                        default=16,
-                        required=False)
-    parser.add_argument('--final-dense-layer',
-                        help='size of final dense layers',
-                        type=int,
-                        default=300,
-                        required=False)
-    parser.add_argument('--multi_edge',
-                        help='specify single edge or multi edge',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--aux_dist_loss_coeff',
-                        help='specify whether to add distance loss to dqn loss',
-                        type=float,
-                        default=0,
-                        required=False)
-    parser.add_argument('--contrastive-loss-coeff',
-                        help='Contrastive loss coefficient',
-                        type=float,
-                        default=0,
-                        required=False)
-    parser.add_argument('--negative-margin',
-                        help='Negative margin for contrastive_loss',
-                        type=float,
-                        default=6.5,
-                        required=False)
-    parser.add_argument('--positive-margin',
-                        help='Positive margin for contrastive_loss',
-                        type=float,
-                        default=2.5,
-                        required=False)
-    parser.add_argument('--self_attention',
-                        help='specify whether self attention applied to node embeddings',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--use_layers',
-                        help='number of GCN layers',
-                        type=int,
-                        default=3,
-                        required=False)
-    parser.add_argument('--reverse_direction',
-                        help='reverse directionality of edges in adj matrix',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--save_dist_freq',
-                        help='save frequency of distances (must have json configured)',
-                        type=int,
-                        default=-1,
-                        required=False)
-    parser.add_argument('--dist_save_folder',
-                        help='path to save images of distances',
-                        type=str,
-                        default="dist_data",
-                        required=False)
-    parser.add_argument('--converged_init',
-                        help='path to saved embeddings',
-                        type=str,
-                        default=None,
-                        required=False)
+from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
+from envs.advanced_malmo_numpy_env import MalmoEnvSpecial as AdvEnvNpy
+from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
 
-    parser.add_argument('--dist_path',
-                        help='path to folder with distance matrix and keys',
-                        type=str,
-                        default=None,
-                        required=False)
+from envs.advanced_malmo_numpy_env_all_tools import MalmoEnvSpecial as EnvNpyAllTools
+from envs.advanced_malmo_numpy_env_correct_tool import MalmoEnvSpecial as EnvNpyCorrectTool
+from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as EnvNpyAllToolsEquip
 
-    parser.add_argument('--disconnect_graph',
-                        help='replace adjacency matrix with disconnected graph',
-                        action="store_true",
-                        required=False)
+from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
+from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
+from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
+from envs.proc_env_creator import MalmoEnvSpecial as EnvEasy_proc_gen
 
-    parser.add_argument('--gcn_activation',
-                        help='gcn activation relu/tanh',
-                        type=str,
-                        default="relu",
-                        required=False)
-
-    parser.add_argument('--dw_init',
-                        help='init using dw from env',
-                        action="store_true",
-                        required=False)
-
-    return parser.parse_args()
 
 
 def init_weights(m):
@@ -308,3 +93,55 @@ def append_timestamp(string, fmt_string=None):
         return string + "_" + now.strftime(fmt_string)
     else:
         return string + "_" + str(now).replace(" ", "_")
+
+def initialize_env(args):
+    #env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address)
+    if args.env == 'npy':
+        env = EnvNpy(random=True, mission=None)
+        test_env = EnvNpy(random=True, mission=None)
+    elif args.env == 'npy_easy':
+        env = EnvEasy(random=True, mission=None)
+        test_env = EnvEasy(random=True, mission=None)
+    elif args.env == 'npy_easy_4task':
+        env = EnvEasy4(random=True, mission=None)
+        test_env = EnvEasy4(random=True, mission=None)
+    elif args.env == 'npy_easy_gen':
+        env = EnvEasy_proc_gen(args.procgen_tools, args.procgen_blocks)
+        test_env = env  #EnvEasy_proc_gen(random=True, mission=None)
+
+    elif args.env == 'npy_easy_4task_mask':
+        env = EnvEasy4_mask(random=True, mission=None, init_window=(0, 76))
+        test_env = EnvEasy4_mask(random=True, mission=None, init_window=(76, None))
+
+    elif args.env == 'npy_stone':
+        env = EnvNpy(random=False, mission="pickaxe_stone")
+        test_env = EnvNpy(random=False, mission="pickaxe_stone")
+    elif args.env == 'adv_npy_all_tools':
+        env = EnvNpyAllTools(random=True, mission=None)
+        test_env = EnvNpyAllTools(random=True, mission=None)
+    elif args.env == 'adv_npy_all_tools_equip':
+        env = EnvNpyAllToolsEquip(random=True, mission=None)
+        test_env = EnvNpyAllToolsEquip(random=True, mission=None)
+    elif args.env == 'adv_npy_correct_tool':
+        env = EnvNpyCorrectTool(random=True, mission=None)
+        test_env = EnvNpyCorrectTool(random=True, mission=None)
+    elif args.env == 'adv_npy':
+        env = AdvEnvNpy(random=True, mission=None)
+        test_env = AdvEnvNpy(random=True, mission=None)
+    elif args.env == 'malmo_server':
+        assert args.address is not None
+        assert args.port is not None
+        env = EnvMalmo(random=True, mission=None)
+        test_env = EnvMalmo(random=True, mission=None)
+        #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address)
+    elif args.ari:
+        env = SortedARIState(AtariARIWrapper(gym.make(args.env)))
+        test_env = SortedARIState(AtariARIWrapper(gym.make(args.env)))
+    else:
+        env = gym.make(args.env)
+        test_env = gym.make(args.env)
+
+    env.seed(args.seed)
+    test_env.seed(args.seed)
+    __import__('pdb').set_trace()
+    return env, test_env

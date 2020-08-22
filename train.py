@@ -7,28 +7,15 @@ import gym
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
-#import minerl
 
-from utils import parse_args, append_timestamp
+from utils import append_timestamp, initialize_env
+from parsers import parser
 
 #https://github.com/pytorch/pytorch/issues/31554
 
-from envs.malmo_numpy_env import MalmoEnvSpecial as EnvNpy
-from envs.advanced_malmo_numpy_env import MalmoEnvSpecial as AdvEnvNpy
-from envs.malmo_env_skyline import MalmoEnvSpecial as EnvMalmo
-
-from envs.advanced_malmo_numpy_env_all_tools import MalmoEnvSpecial as EnvNpyAllTools
-from envs.advanced_malmo_numpy_env_correct_tool import MalmoEnvSpecial as EnvNpyCorrectTool
-from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as EnvNpyAllToolsEquip
-
-from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
-from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
-from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
-from envs.proc_env_creator import MalmoEnvSpecial as EnvEasy_proc_gen
-
 from embed_utils.vis_distance_methods import load_embed_from_torch, visualize_similarity
 
-args = parse_args()
+args = parser.parse_args()
 # Setting cuda seeds
 if torch.cuda.is_available():
     torch.backends.cuda.deterministic = True
@@ -48,51 +35,7 @@ run_tag = args.run_tag
 
 env_graph_data = None
 
-#env = MalmoEnvSpecial("pickaxe_stone",port=args.port, addr=args.address)
-if args.env == 'npy':
-    env = EnvNpy(random=True, mission=None)
-    test_env = EnvNpy(random=True, mission=None)
-elif args.env == 'npy_easy':
-    env = EnvEasy(random=True, mission=None)
-    test_env = EnvEasy(random=True, mission=None)
-elif args.env == 'npy_easy_4task':
-    env = EnvEasy4(random=True, mission=None)
-    test_env = EnvEasy4(random=True, mission=None)
-elif args.env == 'npy_easy_gen':
-    env = EnvEasy_proc_gen(args.procgen_tools, args.procgen_blocks)
-    test_env = env  #EnvEasy_proc_gen(random=True, mission=None)
-
-elif args.env == 'npy_easy_4task_mask':
-    env = EnvEasy4_mask(random=True, mission=None, init_window=(0, 76))
-    test_env = EnvEasy4_mask(random=True, mission=None, init_window=(76, None))
-
-elif args.env == 'npy_stone':
-    env = EnvNpy(random=False, mission="pickaxe_stone")
-    test_env = EnvNpy(random=False, mission="pickaxe_stone")
-elif args.env == 'adv_npy_all_tools':
-    env = EnvNpyAllTools(random=True, mission=None)
-    test_env = EnvNpyAllTools(random=True, mission=None)
-elif args.env == 'adv_npy_all_tools_equip':
-    env = EnvNpyAllToolsEquip(random=True, mission=None)
-    test_env = EnvNpyAllToolsEquip(random=True, mission=None)
-elif args.env == 'adv_npy_correct_tool':
-    env = EnvNpyCorrectTool(random=True, mission=None)
-    test_env = EnvNpyCorrectTool(random=True, mission=None)
-elif args.env == 'adv_npy':
-    env = AdvEnvNpy(random=True, mission=None)
-    test_env = AdvEnvNpy(random=True, mission=None)
-elif args.env == 'malmo_server':
-    assert args.address is not None
-    assert args.port is not None
-    env = EnvMalmo(random=True, mission=None)
-    test_env = EnvMalmo(random=True, mission=None)
-    #"hoe_farmland")#"pickaxe_stone",train_2=True,port=args.port, addr=args.address)
-else:
-    env = gym.make(args.env)
-    test_env = gym.make(args.env)
-
-env.seed(args.seed)
-test_env.seed(args.seed)
+env, test_env = initialize_env(args)
 
 # Check if GPU can be used and was asked for
 if args.gpu and torch.cuda.is_available():
