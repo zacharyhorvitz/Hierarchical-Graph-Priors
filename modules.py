@@ -7,7 +7,6 @@ import torch.nn.functional as F
 from torch.nn.functional import relu
 from torch.nn.functional import tanh
 
-
 from utils import sync_networks, conv2d_size_out
 
 
@@ -28,21 +27,16 @@ class GCN(torch.nn.Module):
 
         self.n = num_nodes
         self.emb_sz = emb_size
-        
+
         if activation == "relu":
             self.activation = relu
         elif activation == "tanh":
             self.activation = tanh
         else:
-            print("Bad activation:",self.activation)
+            print("Bad activation:", self.activation)
             exit()
 
         print("Using activation:", self.activation)
-
-
-
-
-
 
         self.atten = atten
         # self.nodes = torch.arange(0, self.n)
@@ -188,7 +182,7 @@ def self_attention(K, V, Q):
     return build_new_embeds
 
 
-def malmo_build_gcn_param(object_to_char,mode, hier, use_layers, reverse_direction, multi_edge):
+def malmo_build_gcn_param(object_to_char, mode, hier, use_layers, reverse_direction, multi_edge):
 
     # self.object_to_char = object_to_char
 

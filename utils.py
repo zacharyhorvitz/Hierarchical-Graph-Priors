@@ -15,14 +15,8 @@ def parse_args():
                         type=str,
                         default='npy',
                         required=True)
-    parser.add_argument('--procgen-tools',
-                        help='Tools for procgen',
-                        type=int,
-                        default=1)
-    parser.add_argument('--procgen-blocks',
-                        help='Blocks for procgen',
-                        type=int,
-                        default=2)
+    parser.add_argument('--procgen-tools', help='Tools for procgen', type=int, default=1)
+    parser.add_argument('--procgen-blocks', help='Blocks for procgen', type=int, default=2)
     parser.add_argument('--run-tag', help='Tag to identify experiment', type=str, required=True)
     parser.add_argument('--address', help='ip address', type=str, required=False)
     parser.add_argument('--port', help='Port', type=int, required=False)
@@ -150,17 +144,9 @@ def parse_args():
                         type=int,
                         default=10,
                         required=False)
-    parser.add_argument('--use-hier',
-                        help='Use latent nodes',
-                        action='store_true',
-                        required=False)
-    parser.add_argument('--mode', 
-                        help='select mode',
-                        required=True)
-    parser.add_argument('--atten', 
-                        help='Use block attention',
-                        action='store_true',
-                        required=False)
+    parser.add_argument('--use-hier', help='Use latent nodes', action='store_true', required=False)
+    parser.add_argument('--mode', help='select mode', required=True)
+    parser.add_argument('--atten', help='Use block attention', action='store_true', required=False)
     parser.add_argument('--one_layer',
                         help='just compute attention over neighbors',
                         action='store_true',
@@ -249,8 +235,6 @@ def parse_args():
                         help='init using dw from env',
                         action="store_true",
                         required=False)
-
-
 
     return parser.parse_args()
 

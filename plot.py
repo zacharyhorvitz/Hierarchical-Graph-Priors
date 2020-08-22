@@ -56,7 +56,7 @@ def plot(data, x, y, hue, style, col, seed, savepath=None, show=True):
         col_wrap = None
     __import__('pdb').set_trace()
     palette = sns.color_palette('Set1', n_colors=len(data[hue].unique()), desat=0.5)
-    
+
     if isinstance(seed, list) or seed == 'average':
         g = sns.relplot(x=x,
                         y=y,
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     df = collate_results(args.results_dirs, args.filename, args.bin_size, args.window_size)
     df = df.convert_dtypes(convert_string=False, convert_integer=False)
     bool_cols = df.dtypes[df.dtypes == 'boolean'].index
-    df = df.replace(to_replace={k:pd.NA for k in bool_cols}, value={k:False for k in bool_cols})
+    df = df.replace(to_replace={k: pd.NA for k in bool_cols}, value={k: False for k in bool_cols})
     if not args.no_plot:
         assert args.x is not None and args.y is not None, "Must pass x, y if creating csv"
         if args.savepath:
