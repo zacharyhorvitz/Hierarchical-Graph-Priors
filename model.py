@@ -287,8 +287,12 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.node_to_name = node_to_name
             self.name_to_node = {v: k for k, v in self.node_to_name.items()}
             self.adjacency = adjacency
-            self.undirect_adj = torch.FloatTensor(np.logical_or(self.adjacency.numpy(),self.adjacency.numpy().transpose(0,2,1))[0].astype(float))
-            print(self.undirect_adj,torch.sum(self.undirect_adj,-1))
+            self.undirect_adj = torch.as_tensor(
+                np.logical_or(self.adjacency.cpu().numpy(),
+                              self.adjacency.cpu().numpy().transpose(0, 2, 1))[0].astype(float),
+                device=self.device,
+                dtype=torch.float)
+            print(self.undirect_adj, torch.sum(self.undirect_adj, -1))
             self.undirect_adj.to(self.device)
 
             if self.disconnect_graph:
@@ -431,7 +435,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         return dist
 
 
-      
+
     def undirected_embed_loss(self):
 
         pairs = self.embeds(self.pairs)
