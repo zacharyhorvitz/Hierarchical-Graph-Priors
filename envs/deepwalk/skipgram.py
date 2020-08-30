@@ -9,9 +9,9 @@ from gensim.models.word2vec import Vocab
 
 logger = logging.getLogger("deepwalk")
 
+
 class Skipgram(Word2Vec):
     """A subclass to allow more customization of the Word2Vec internals."""
-
     def __init__(self, vocabulary_counts=None, **kwargs):
 
         self.vocabulary_counts = None
@@ -26,6 +26,6 @@ class Skipgram(Word2Vec):
         kwargs["seed"] = kwargs.get("seed", 0)
 
         if vocabulary_counts != None:
-          self.vocabulary_counts = vocabulary_counts
+            self.vocabulary_counts = vocabulary_counts
 
         super(Skipgram, self).__init__(**kwargs)

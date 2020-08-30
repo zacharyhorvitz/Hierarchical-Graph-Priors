@@ -6,7 +6,6 @@ from gym.spaces import Discrete
 
 
 class MalmoEnvSpecial(gym.Env):
-
     def init_map(self, mission):
         arena = np.ones((13, 13))
         arena[4:9, 4:9] = 0
@@ -14,10 +13,11 @@ class MalmoEnvSpecial(gym.Env):
         #item_x = 8
         #item_y = 8
 
- #       blocK_y = random.randint(1, 4) + arena_shift
-  #      block_x = random.randint(0, 4) + arena_shift
-        spawn_entities = [] #["stone","log","water","dirt"]+["pickaxe_item","axe_item","bucket_item","hoe_item"]
- 
+        #       blocK_y = random.randint(1, 4) + arena_shift
+        #      block_x = random.randint(0, 4) + arena_shift
+        spawn_entities = [
+        ]  #["stone","log","water","dirt"]+["pickaxe_item","axe_item","bucket_item","hoe_item"]
+
         all_missions = [mission] + [random.choice(self.mission_types)]
         for m in all_missions:
             if m == "pickaxe_stone":
@@ -29,47 +29,45 @@ class MalmoEnvSpecial(gym.Env):
             elif m == "bucket_water":
                 spawn_entities += ["water"]
             else:
-                print("Bad mission",m)
+                print("Bad mission", m)
                 exit()
 
-
-        locations = np.random.choice(np.arange(len(self.poss_spawn_loc)), size=len(spawn_entities), replace=False)
-        for ent,l in zip(spawn_entities,locations):
+        locations = np.random.choice(np.arange(len(self.poss_spawn_loc)),
+                                     size=len(spawn_entities),
+                                     replace=False)
+        for ent, l in zip(spawn_entities, locations):
             ent_id = self.object_2_index[ent]
             coords = self.poss_spawn_loc[l]
             arena[coords[0]][coords[1]] = ent_id
 
         return arena
 
-    def arena_obs(self, add_selected_item=True, add_goal=True,add_inv=True,render=False):
+    def arena_obs(self, add_selected_item=True, add_goal=True, add_inv=True, render=False):
         cur_arena = self.arena.copy()
         if render:
-           god_view = self.arena.copy()
-           god_view[self.player_y][self.player_x] = -1
-           print(god_view)
-           print("EQUIPPED:",self.equipped_item) 
-           print(self.inventory)
+            god_view = self.arena.copy()
+            god_view[self.player_y][self.player_x] = -1
+            print(god_view)
+            print("EQUIPPED:", self.equipped_item)
+            print(self.inventory)
         if add_selected_item:
-            cur_arena[self.player_y][self.player_x] = self.equipped_item #self.inventory[self.selected_inv_item]
-        obs = cur_arena[self.player_y - 4:self.player_y + 5,
-                        self.player_x - 4:self.player_x + 5]
+            cur_arena[self.player_y][
+                self.player_x] = self.equipped_item  #self.inventory[self.selected_inv_item]
+        obs = cur_arena[self.player_y - 4:self.player_y + 5, self.player_x - 4:self.player_x + 5]
         if add_inv:
-#             if self.selected_inv_item == 0:
+            #             if self.selected_inv_item == 0:
             inv_obs = self.inventory
-#             else:
-#                inv_obs = self.inventory # np.concatenate((self.inventory[self.selected_inv_item:],self.inventory[:self.selected_inv_item]))
-            obs = np.concatenate((inv_obs.reshape(-1,1), obs),axis=1)
-            
+            #             else:
+            #                inv_obs = self.inventory # np.concatenate((self.inventory[self.selected_inv_item:],self.inventory[:self.selected_inv_item]))
+            obs = np.concatenate((inv_obs.reshape(-1, 1), obs), axis=1)
+
         if add_goal:
-            obs = np.concatenate((np.ones(
-                (9, 1)) * self.object_2_index[self.goal], obs),
-                                 axis=1)
-         
+            obs = np.concatenate((np.ones((9, 1)) * self.object_2_index[self.goal], obs), axis=1)
 
     #	print(obs)
 
-       # for orig, new in (13, 5), (14, 7), (15, 8):
-       #     obs = np.where(obs == orig, new, obs)
+    # for orig, new in (13, 5), (14, 7), (15, 8):
+    #     obs = np.where(obs == orig, new, obs)
         return obs.reshape(1, 9, -1)
 
     def reset(self):
@@ -90,8 +88,8 @@ class MalmoEnvSpecial(gym.Env):
         self.attacking = False
         self.using = False
         self.steps = 0
-        self.inventory = np.array([3,6,9,11,0,0,0,0,0])
-#         self.selected_inv_item = 0 
+        self.inventory = np.array([3, 6, 9, 11, 0, 0, 0, 0, 0])
+        #         self.selected_inv_item = 0
         self.equipped_item = 0
         return self.arena_obs()
 
@@ -103,8 +101,7 @@ class MalmoEnvSpecial(gym.Env):
             if self.object_2_index["log_item"] in self.inventory:
                 return True
         elif self.current_mission == "hoe_farmland":
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["farmland"]:
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["farmland"]:
                 return True
         elif self.current_mission == "bucket_water":
             if self.object_2_index["water_bucket_item"] in self.inventory:
@@ -119,8 +116,9 @@ class MalmoEnvSpecial(gym.Env):
                 return True
         return False
 
+
 #     def shift_inv(self):
-#         if np.sum(self.inventory) == 0: 
+#         if np.sum(self.inventory) == 0:
 #             pass
 #         else:
 #            shift = 0
@@ -129,7 +127,7 @@ class MalmoEnvSpecial(gym.Env):
 #                self.selected_inv_item = self.selected_inv_item % len(self.inventory)
 #                shift+=1
 
-    def equip(self,value):
+    def equip(self, value):
         if self.object_2_index[value] in self.inventory:
             self.equipped_item = self.object_2_index[value]
         else:
@@ -140,20 +138,16 @@ class MalmoEnvSpecial(gym.Env):
             print("Invalid Action: {}".format(action))
         else:
             if self.actions[action] == "movenorth":
-                if self.arena[self.player_y +
-                              1][self.player_x] in self.passable:
+                if self.arena[self.player_y + 1][self.player_x] in self.passable:
                     self.player_y += 1
             elif self.actions[action] == "movesouth":
-                if self.arena[self.player_y -
-                              1][self.player_x] in self.passable:
+                if self.arena[self.player_y - 1][self.player_x] in self.passable:
                     self.player_y -= 1
             elif self.actions[action] == "movewest":
-                if self.arena[self.player_y][self.player_x +
-                                             1] in self.passable:
+                if self.arena[self.player_y][self.player_x + 1] in self.passable:
                     self.player_x += 1
             elif self.actions[action] == "moveeast":
-                if self.arena[self.player_y][self.player_x -
-                                             1] in self.passable:
+                if self.arena[self.player_y][self.player_x - 1] in self.passable:
                     self.player_x -= 1
             elif self.actions[action] == "attack 0":
                 self.attacking = False
@@ -168,7 +162,7 @@ class MalmoEnvSpecial(gym.Env):
             elif self.actions[action] == "equip pickaxe":
                 self.equip("pickaxe_item")
             elif self.actions[action] == "equip axe":
-                self.equip("axe_item")            
+                self.equip("axe_item")
             elif self.actions[action] == "equip hoe":
                 self.equip("hoe_item")
             elif self.actions[action] == "equip bucket":
@@ -177,36 +171,28 @@ class MalmoEnvSpecial(gym.Env):
             if self.insert_inv(self.arena[self.player_y][self.player_x]):
                 self.arena[self.player_y][self.player_x] = 0
         if self.attacking:
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["stone"]:
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["stone"]:
                 if self.equipped_item == self.object_2_index["pickaxe_item"]:
-                    self.arena[self.player_y + 1][
-                        self.player_x] = self.object_2_index["cobblestone_item"]
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["log"]:
+                    self.arena[self.player_y +
+                               1][self.player_x] = self.object_2_index["cobblestone_item"]
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["log"]:
                 if self.equipped_item == self.object_2_index["axe_item"]:
-                    self.arena[self.player_y + 1][
-                        self.player_x] = self.object_2_index["log_item"]
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["dirt"]:
-                self.arena[self.player_y +
-                           1][self.player_x] = self.object_2_index["dirt_item"]
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["farmland"]:
-                self.arena[self.player_y + 1][
-                    self.player_x] = self.object_2_index["farmland_item"]
+                    self.arena[self.player_y + 1][self.player_x] = self.object_2_index["log_item"]
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["dirt"]:
+                self.arena[self.player_y + 1][self.player_x] = self.object_2_index["dirt_item"]
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["farmland"]:
+                self.arena[self.player_y + 1][self.player_x] = self.object_2_index["farmland_item"]
         if self.using:
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["dirt"]:
-                if self.equipped_item == self.object_2_index["hoe_item"]: #self.inventory[self.selected_inv_item] == self.object_2_index["hoe_item"]:
-                    self.arena[self.player_y + 1][
-                        self.player_x] = self.object_2_index["farmland"]
-            if self.arena[self.player_y +
-                          1][self.player_x] == self.object_2_index["water"]:
-              #  print("USING IN FRONT OF WATER")
-                if self.equipped_item == self.object_2_index["bucket_item"]: #self.inventory[self.selected_inv_item] == self.object_2_index["bucket_item"]:
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["dirt"]:
+                if self.equipped_item == self.object_2_index[
+                        "hoe_item"]:  #self.inventory[self.selected_inv_item] == self.object_2_index["hoe_item"]:
+                    self.arena[self.player_y + 1][self.player_x] = self.object_2_index["farmland"]
+            if self.arena[self.player_y + 1][self.player_x] == self.object_2_index["water"]:
+                #  print("USING IN FRONT OF WATER")
+                if self.equipped_item == self.object_2_index[
+                        "bucket_item"]:  #self.inventory[self.selected_inv_item] == self.object_2_index["bucket_item"]:
                     #	print("using bucket in inventory")
-               #     print("BUCKET USED")
+                    #     print("BUCKET USED")
                     self.arena[self.player_y + 1][self.player_x] = 0
                     locations = np.where(self.inventory == self.equipped_item)
                     self.equipped_item = self.object_2_index["water_bucket_item"]
@@ -246,14 +232,21 @@ class MalmoEnvSpecial(gym.Env):
         #    "attack 1", "use 0", "use 1","equip pickaxe","equip axe","equip hoe","equip bucket"
         #]
         self.actions = [
-            "movenorth", "movesouth", "movewest", "moveeast","attack 1", "use 1","equip pickaxe","equip axe","equip hoe","equip bucket"
+            "movenorth",
+            "movesouth",
+            "movewest",
+            "moveeast",
+            "attack 1",
+            "use 1",
+            "equip pickaxe",
+            "equip axe",
+            "equip hoe",
+            "equip bucket"
         ]
         self.action_space = Discrete(len(self.actions))
-        self.observation_space = (9,9)
+        self.observation_space = (9, 9)
 
-        self.mission_types = [
-            "pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"
-        ]
+        self.mission_types = ["pickaxe_stone", "axe_log", "hoe_farmland", "bucket_water"]
         self.step_cost = -0.1
         self.goal_reward = 1000.0
         self.max_steps = 1000.0
@@ -276,34 +269,27 @@ class MalmoEnvSpecial(gym.Env):
             "farmland_item": 15
         }
 
-
-
         self.index_2_object = {v: k for k, v in self.object_2_index.items()}
-        self.collectable = {
-            v for k, v in self.object_2_index.items() if "item" in k
-        }
-        self.passable = set(
-            list(self.collectable) + [0] + [self.object_2_index["water"]])
+        self.collectable = {v for k, v in self.object_2_index.items() if "item" in k}
+        self.passable = set(list(self.collectable) + [0] + [self.object_2_index["water"]])
         self.poss_spawn_loc = []
-        for y in range(5, 8+1):
-             for x in range(4, 8+1):
-                 self.poss_spawn_loc.append((y,x))
+        for y in range(5, 8 + 1):
+            for x in range(4, 8 + 1):
+                self.poss_spawn_loc.append((y, x))
 
         self.reset()
-        
-
 
 if __name__ == "__main__":
 
-    env = MalmoEnvSpecial(True) #False,"bucket_water")
+    env = MalmoEnvSpecial(True)  #False,"bucket_water")
     obs = env.reset()
     print("reset")
     for step in range(100):
         print("\n", step)
         try:
-           command = int(input())
+            command = int(input())
         except ValueError:
-           command = 8
+            command = 8
         obs, reward, done, info = env.step(command)
         print(obs)
         print(reward)

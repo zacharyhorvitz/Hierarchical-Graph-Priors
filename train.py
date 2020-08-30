@@ -60,7 +60,7 @@ elif args.env == 'npy_easy_4task':
     test_env = EnvEasy4(random=True, mission=None)
 elif args.env == 'npy_easy_gen':
     env = EnvEasy_proc_gen(args.procgen_tools, args.procgen_blocks)
-    test_env = env #EnvEasy_proc_gen(random=True, mission=None)
+    test_env = env  #EnvEasy_proc_gen(random=True, mission=None)
 
 elif args.env == 'npy_easy_4task_mask':
     env = EnvEasy4_mask(random=True, mission=None, init_window=(0, 76))
@@ -123,42 +123,74 @@ else:
 
 # Initialize model
 agent_args = {
-    "device": device,
+    "device":
+        device,
     "state_space": (env.observation_space[0], env.observation_space[1]),
-    "action_space": env.action_space,
-    "num_actions": num_actions,
-    "target_moving_average": args.target_moving_average,
-    "gamma": args.gamma,
-    "replay_buffer_size": args.replay_buffer_size,
-    "epsilon_decay": args.epsilon_decay,
-    "epsilon_decay_end": args.epsilon_decay_end,
-    "warmup_period": args.warmup_period,
-    "double_DQN": not (args.vanilla_DQN),
-    "model_type": args.model_type,
-    "num_frames": args.emb_size,
-    "mode": args.mode,
-    "hier": args.use_hier,
-    "atten": args.atten,
-    "emb_size": args.emb_size,
-    "one_layer": args.one_layer,
-    "multi_edge": args.multi_edge,
-    "model_size": args.model_size,
-    "final_dense_layer": args.final_dense_layer,
-    "aux_dist_loss_coeff": args.aux_dist_loss_coeff,
-    "contrastive_loss_coeff": args.contrastive_loss_coeff,
-    "positive_margin": args.positive_margin,
-    "negative_margin": args.negative_margin,
-    "self_attention": args.self_attention,
-    "use_layers": args.use_layers,
-    "converged_init": args.converged_init,
-    "dist_path": args.dist_path,
-    "reverse_direction": args.reverse_direction,
-    "env_graph_data":  env.generate_graph_info(args.mode in {"skyline_hier"},args.reverse_direction) if args.env == 'npy_easy_gen' else None,
-    "disconnect_graph": args.disconnect_graph,
-    "gcn_activation": args.gcn_activation,
-    "dw_init": args.dw_init
-
-
+    "action_space":
+        env.action_space,
+    "num_actions":
+        num_actions,
+    "target_moving_average":
+        args.target_moving_average,
+    "gamma":
+        args.gamma,
+    "replay_buffer_size":
+        args.replay_buffer_size,
+    "epsilon_decay":
+        args.epsilon_decay,
+    "epsilon_decay_end":
+        args.epsilon_decay_end,
+    "warmup_period":
+        args.warmup_period,
+    "double_DQN":
+        not (args.vanilla_DQN),
+    "model_type":
+        args.model_type,
+    "num_frames":
+        args.emb_size,
+    "mode":
+        args.mode,
+    "hier":
+        args.use_hier,
+    "atten":
+        args.atten,
+    "emb_size":
+        args.emb_size,
+    "one_layer":
+        args.one_layer,
+    "multi_edge":
+        args.multi_edge,
+    "model_size":
+        args.model_size,
+    "final_dense_layer":
+        args.final_dense_layer,
+    "aux_dist_loss_coeff":
+        args.aux_dist_loss_coeff,
+    "contrastive_loss_coeff":
+        args.contrastive_loss_coeff,
+    "positive_margin":
+        args.positive_margin,
+    "negative_margin":
+        args.negative_margin,
+    "self_attention":
+        args.self_attention,
+    "use_layers":
+        args.use_layers,
+    "converged_init":
+        args.converged_init,
+    "dist_path":
+        args.dist_path,
+    "reverse_direction":
+        args.reverse_direction,
+    "env_graph_data":
+        env.generate_graph_info(args.mode in {"skyline_hier"}, args.reverse_direction)
+        if args.env == 'npy_easy_gen' else None,
+    "disconnect_graph":
+        args.disconnect_graph,
+    "gcn_activation":
+        args.gcn_activation,
+    "dw_init":
+        args.dw_init
 }
 agent = DQN_agent(**agent_args)
 

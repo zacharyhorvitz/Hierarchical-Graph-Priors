@@ -63,7 +63,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         self.disconnect_graph = disconnect_graph
         self.final_dense_layer = final_dense_layer
         self.env_graph_data = env_graph_data
-        self.dw_init=dw_init
+        self.dw_init = dw_init
         self.model_size = model_size
         if isinstance(state_space, Space):
             self.input_shape = state_space.shape
@@ -287,14 +287,17 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             self.node_to_name = node_to_name
             self.name_to_node = {v: k for k, v in self.node_to_name.items()}
             self.adjacency = adjacency
-            self.undirect_adj = torch.FloatTensor(np.logical_or(self.adjacency.numpy(),self.adjacency.numpy().transpose(0,2,1))[0].astype(float))
-            print(self.undirect_adj,torch.sum(self.undirect_adj,-1))
+            self.undirect_adj = torch.as_tensor(np.logical_or(
+                self.adjacency.cpu().numpy(),
+                self.adjacency.cpu().numpy().transpose(0, 2, 1))[0].astype(float),
+                                                device=self.device,
+                                                dtype=torch.float)
+            print(self.undirect_adj, torch.sum(self.undirect_adj, -1))
             self.undirect_adj.to(self.device)
 
             if self.disconnect_graph:
                 print("DISCONNECTING GRAPH")
-                self.adjacency = torch.eye(self.adjacency.shape[0]).unsqueeze(0).to(
-                    self.device)
+                self.adjacency = torch.eye(self.adjacency.shape[0]).unsqueeze(0).to(self.device)
 
             self.edges = edges
             self.latent_nodes = latent_nodes
@@ -382,10 +385,9 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
         elif self.dw_init:
             print("USING DEEP WALK INIT")
             assert self.env_graph_data is not None
-            self.embeds.weight = torch.nn.Parameter(torch.FloatTensor(self.env_graph_data["dw_embeds"]).to(self.device))
+            self.embeds.weight = torch.nn.Parameter(
+                torch.FloatTensor(self.env_graph_data["dw_embeds"]).to(self.device))
             self.embeds.weight.requires_grad = True
-
-
 
         # pre_init_embeds = None
 
@@ -430,22 +432,18 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
 
         return dist
 
-
-      
     def undirected_embed_loss(self):
 
         pairs = self.embeds(self.pairs)
-        dot_products = torch.sum(pairs[:, 0] * pairs[:, 1],-1)
+        dot_products = torch.sum(pairs[:, 0] * pairs[:, 1], -1)
         goals = self.undirect_adj[self.pairs[:, 0], self.pairs[:, 1]]
-        return self.pairwise_loss(dot_products,goals)
-
+        return self.pairwise_loss(dot_products, goals)
 
     def get_pairwise_loss(self):
         if self.dist_path is not None:
             return self.pairwise_loss(self.embed_pairs(), self.get_true_dist().cuda())
         else:
             return self.undirected_embed_loss()
-
 
     def contrastive_loss_func(self, positive_margin, negative_margin):
 
@@ -556,7 +554,7 @@ class DQN_MALMO_CNN_model(torch.nn.Module):
             inv_encoded = self.inv_block(inventory, node_embeds, goal_embeddings)
             cnn_output = torch.cat((cnn_output, inv_encoded), -1)
 
-        if self.extract_goal: # TODO rename to reflect that this is goal + other stuff
+        if self.extract_goal:  # TODO rename to reflect that this is goal + other stuff
             cnn_output = torch.cat((cnn_output, goal_embeddings.view(goal_embeddings.shape[0], -1)),
                                    -1)
 
@@ -656,7 +654,9 @@ class DQN_agent:
                                               self_attention=self_attention,
                                               one_layer=one_layer,
                                               env_graph_data=env_graph_data,
-                                              disconnect_graph=disconnect_graph,gcn_activation=gcn_activation,dw_init=dw_init)
+                                              disconnect_graph=disconnect_graph,
+                                              gcn_activation=gcn_activation,
+                                              dw_init=dw_init)
 
             self.target = DQN_MALMO_CNN_model(device,
                                               state_space,
@@ -681,8 +681,9 @@ class DQN_agent:
                                               self_attention=self_attention,
                                               one_layer=one_layer,
                                               env_graph_data=env_graph_data,
-                                            disconnect_graph=disconnect_graph,gcn_activation=gcn_activation,dw_init=dw_init)
-
+                                              disconnect_graph=disconnect_graph,
+                                              gcn_activation=gcn_activation,
+                                              dw_init=dw_init)
 
         else:
             raise NotImplementedError(model_type)
@@ -699,8 +700,6 @@ class DQN_agent:
         self.epsilon_decay_end = epsilon_decay_end
         self.warmup_period = warmup_period
         self.device = device
-
-
 
         self.model_type = model_type
         self.double_DQN = double_DQN
