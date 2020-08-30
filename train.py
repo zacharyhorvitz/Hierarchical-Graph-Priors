@@ -24,7 +24,7 @@ from envs.advanced_malmo_numpy_env_all_tools_equip import MalmoEnvSpecial as Env
 from envs.numpy_easy import MalmoEnvSpecial as EnvEasy
 from envs.numpy_easy_4task import MalmoEnvSpecial as EnvEasy4
 from envs.numpy_easy_4task_mask_init import MalmoEnvSpecial as EnvEasy4_mask
-from envs.proc_env_creator import MalmoEnvSpecial as EnvEasy_proc_gen
+from envs.proc_env_creator_noisy import MalmoEnvSpecial as EnvEasy_proc_gen
 
 from embed_utils.vis_distance_methods import load_embed_from_torch, visualize_similarity
 
@@ -59,7 +59,7 @@ elif args.env == 'npy_easy_4task':
     env = EnvEasy4(random=True, mission=None)
     test_env = EnvEasy4(random=True, mission=None)
 elif args.env == 'npy_easy_gen':
-    env = EnvEasy_proc_gen(args.procgen_tools, args.procgen_blocks)
+    env = EnvEasy_proc_gen(args.procgen_tools, args.procgen_blocks,args.noise_type,args.noise_percent)
     test_env = env  #EnvEasy_proc_gen(random=True, mission=None)
 
 elif args.env == 'npy_easy_4task_mask':

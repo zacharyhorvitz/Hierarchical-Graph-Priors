@@ -59,7 +59,7 @@ class MalmoEnvSpecial(gym.Env):
         for i in range(len(adjacency)):
             adjacency[i][i] = 1.0
 
-        if self.noise_percent == 0:
+        if self.noise_percent == 0 or self.noise_type == "none":
             graph_block_mapping = self.block_properties_dict 
 
         else:
@@ -72,7 +72,8 @@ class MalmoEnvSpecial(gym.Env):
             random.shuffle(block_list)
             change_drops_for = block_list[:round(len(block_list)*self.noise_percent)]
 
-            print(change_tools_for,change_drops_for)
+            # print(change_tools_for,change_drops_for)
+
 
             if self.noise_type == "swap":
 

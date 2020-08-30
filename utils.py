@@ -236,6 +236,18 @@ def parse_args():
                         action="store_true",
                         required=False)
 
+    parser.add_argument('--noise_type',
+                        help='type of noise: none, swap or remove',
+                        type=str,
+                        default="none",
+                        required=False)
+
+    parser.add_argument('--noise_percent',
+                        help='type of noise: none, swap or remove',
+                        type=float,
+                        default=0,
+                        required=False)
+
     return parser.parse_args()
 
 
